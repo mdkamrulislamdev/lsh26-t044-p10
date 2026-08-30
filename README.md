@@ -4,7 +4,16 @@ LofiStack Hackathon 2026 · Problem **P10**
 
 Four tabs, in order: **Household → Balance → Questions → Habits**.
 
-**Live URL:** _add the public deployment URL here._
+## Submission (copy these exactly)
+
+| Field | Value |
+|---|---|
+| Problem ID | `p10` |
+| Public repository | https://github.com/mdkamrulislamdev/p1 |
+| Commit SHA (40 characters) | `6e0b12609167dad9b15c8919a69765570e1a63f4` |
+| Live application URL | _add the public https URL after deploy — not `main`, not a short SHA, not localhost_ |
+
+A branch name or a short SHA is not accepted. The SHA above is the full hash of the product freeze on `main`.
 
 **Demo video:** _add a ≤ 60 second link: Load 6-month household → Balance → Questions → Habits._
 
