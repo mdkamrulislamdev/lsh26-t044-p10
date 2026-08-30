@@ -10,9 +10,9 @@ LofiStack Hackathon 2026
 | **Public repository** | https://github.com/mdkamrulislamdev/lsh26-t044-p10 |
 | **Commit SHA** | After you push, run `git rev-parse HEAD` and paste the **full 40-character** hash on the form. Do not paste `main` or a short SHA. |
 
-Four tabs, in order: **Household → Balance → Questions → Habits**.
+Four required tabs, in order: **Household → Balance → Questions → Habits**. Bonus: **Plan** (slab headroom and Friday–Saturday shop-closure recharge).
 
-Third-party licenses: [`LICENSES.md`](./LICENSES.md). How the engine works: [`architecture.md`](./architecture.md). Event fields: [`EVENT.md`](./EVENT.md).
+Third-party licenses: [`LICENSES.md`](./LICENSES.md). How the engine works: [`architecture.md`](./architecture.md). Event fields: [`EVENT.md`](./EVENT.md). Judge pack: [`evaluation-manifest.json`](./evaluation-manifest.json).
 
 **Demo video:** _add the ≤ 60 second link here after upload._
 
@@ -32,10 +32,10 @@ Open the URL Vite prints (usually `http://localhost:5173`). Judges should use th
 ```bash
 npm run build
 npm run preview
-npm run test:engine
+npm test
 ```
 
-Engine tests need `docs/P10_prepaid_meter_public.json` on disk (gitignored; copy from the problem pack). The app ships `src/data/household.json` and does not need that file to run.
+`npm test` (same as `npm run test:engine`) prints every unit check and every public case as PASS or FAIL, then an overall summary. It also writes `docs/test_report.json` (gitignored). The fixture `docs/P10_prepaid_meter_public.json` must be on disk (copy from the problem pack). The live app ships `src/data/household.json` and does not need that file to run.
 
 ---
 
@@ -65,15 +65,20 @@ We put every taka amount in one browser engine (`src/billingEngine.ts`) and let 
 
 Clarifications: **R-16** (no energy-rate saving from timing; difference is only ৳82 counts; ties allowed) and **R-33** (cost ≠ deposit; opening balance and months from `comparison`).
 
+### Bonus. Plan (stay on this month)
+
+**Plan** is extra, not one of the four scored items. It shows how many units remain in this month’s tariff slab (so the family can avoid jumping to a more expensive rate) and, if run-out falls on Friday or Saturday, the Thursday recharge amount that lasts through Sunday when many shops are closed. **Download family plan** saves a plain-text file on the device — nothing is uploaded.
+
 ---
 
 ## Major decisions
 
 1. Browser-only engine so the live URL needs no server.
-2. Four tabs, one required item each, instead of one crowded dashboard.
+2. Four required tabs in problem order, plus a labelled Plan bonus.
 3. Cost is never the deposit amount.
 4. String dates and two-decimal taka so the 1st and paisa stay stable.
 5. Tests against the 25 public cases so R-16 / R-33 hold beyond the built-in household.
+6. A stay-on Plan tab so a family can avoid the next slab and avoid a Friday blackout.
 
 ---
 
@@ -85,6 +90,7 @@ Clarifications: **R-16** (no energy-rate saving from timing; difference is only 
 - Refreshing the page clears the loaded household (no login, no database).
 - “Higher slab” is energy minus (units × 4.63), not a separate billed fee.
 - Demo video link is filled when the recording is uploaded.
+- Family plan download is local text only.
 
 Empty or invalid JSON shows an error and does not crash. Other tabs send you back to Household if nothing is loaded.
 
@@ -94,7 +100,7 @@ Empty or invalid JSON shows an error and does not crash. Other tabs send you bac
 
 | Member | Contribution |
 |---|---|
-| Kamrul (`cdkamrul9`) | Product: four-tab UI, household JSON, billing engine (slabs, simulation, predictions, habits), tests, README / licenses / architecture, live deploy |
+| Kamrul (`mdkamrulislamdev`) | Product: four-tab UI, household JSON, billing engine (slabs, simulation, predictions, habits), stay-on Plan bonus, tests, README / licenses / architecture / evaluation-manifest, live deploy |
 
 Add other registered members here if the arena lists more than one.
 

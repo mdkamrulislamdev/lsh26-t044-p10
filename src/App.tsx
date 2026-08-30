@@ -10,13 +10,17 @@ import {
   YAxis,
 } from 'recharts'
 import {
+  adviseClosedShopRecharge,
   calendarMonthKey,
   compareHabits,
+  daysUntilNextSlab,
+  getSlabPosition,
   runPredictions,
   runSimulation,
   type SimulationPoint,
 } from './billingEngine'
 import household from './data/household.json'
+import { buildFamilyPlanText, downloadPlainText } from './familyPlan'
 
 const HOUSEHOLD_JSON = JSON.stringify(household, null, 2)
 const MAX_JSON_CHARS = 5_000_000
@@ -26,6 +30,7 @@ const SECTIONS = [
   { id: 'balance', step: '2', label: 'Balance', hint: 'Day-by-day line' },
   { id: 'questions', step: '3', label: 'Questions', hint: 'Run out & top up' },
   { id: 'habits', step: '4', label: 'Habits', hint: 'Low vs monthly' },
+  { id: 'plan', step: 'Bonus', label: 'Plan', hint: 'Stay on this month' },
 ] as const
 
 type SectionId = (typeof SECTIONS)[number]['id']
@@ -277,40 +282,81 @@ export default function App() {
   const chartData = simulation?.history ?? []
   const facts = useMemo(() => (parsedData ? summarizeHousehold(parsedData) : null), [parsedData])
 
-  const predictions = useMemo(() => {
-    if (!parsedData || !simulation?.history.length) return null
-    if (parsedData.usual_daily_units === undefined || !targetDate) return null
-
-    const todayState =
-      simulation.history.find((row) => row.date === parsedData.today) ??
-      simulation.history[simulation.history.length - 1]
-    const today = parsedData.today ?? todayState.date
-    const paidThisMonth = simulation.history
-      .filter((row) => row.date.substring(0, 7) === today.substring(0, 7))
-      .some((row) => row.fixedChargesTaken > 0)
-
-    return runPredictions(
-      {
-        balance: todayState.balance,
-        date: today,
-        currentMonth: calendarMonthKey(today),
-        monthRunningUnits: todayState.monthRunningUnits,
-        hasPaidFixedChargesThisMonth: paidThisMonth,
-      },
-      parsedData.usual_daily_units,
-      targetDate,
-    )
-  }, [parsedData, simulation, targetDate])
-
   const habitResult = useMemo(() => {
     if (!parsedData?.comparison) return null
     return compareHabits(parsedData.days, parsedData.comparison)
   }, [parsedData])
 
   const comparison = parsedData?.comparison
-  const todayBalance =
-    simulation?.history.find((row) => row.date === parsedData?.today)?.balance ??
-    simulation?.finalState.balance
+  const todayRow =
+    simulation?.history.find((row) => row.date === parsedData?.today) ??
+    simulation?.history[simulation.history.length - 1]
+  const todayBalance = todayRow?.balance ?? simulation?.finalState.balance
+
+  const predictionState = useMemo(() => {
+    if (!parsedData || !simulation?.history.length || !todayRow) return null
+    const today = parsedData.today ?? todayRow.date
+    const paidThisMonth = simulation.history
+      .filter((row) => row.date.substring(0, 7) === today.substring(0, 7))
+      .some((row) => row.fixedChargesTaken > 0)
+    return {
+      balance: todayRow.balance,
+      date: today,
+      currentMonth: calendarMonthKey(today),
+      monthRunningUnits: todayRow.monthRunningUnits,
+      hasPaidFixedChargesThisMonth: paidThisMonth,
+    }
+  }, [parsedData, simulation, todayRow])
+
+  const predictions = useMemo(() => {
+    if (!parsedData || !predictionState || parsedData.usual_daily_units === undefined) return null
+    return runPredictions(
+      predictionState,
+      parsedData.usual_daily_units,
+      targetDate || predictionState.date,
+    )
+  }, [parsedData, predictionState, targetDate])
+
+  const slab = getSlabPosition(todayRow?.monthRunningUnits ?? 0)
+  const usualDailyUnits = parsedData?.usual_daily_units
+  const slabDays = daysUntilNextSlab(slab.unitsLeftInSlab, usualDailyUnits ?? 0)
+  const shopAdvice = adviseClosedShopRecharge(predictions?.runOutDate ?? null)
+  const coverUntilDate = shopAdvice.coverUntilDate
+
+  const weekendCover =
+    predictionState && usualDailyUnits !== undefined && coverUntilDate
+      ? runPredictions(predictionState, usualDailyUnits, coverUntilDate)
+      : null
+
+  const handleDownloadPlan = () => {
+    if (!parsedData || !facts) return
+    const text = buildFamilyPlanText({
+      generatedOn: new Date().toISOString().slice(0, 10),
+      monthCount: facts.monthCount,
+      lightMonth: monthLabel(facts.lightMonth),
+      lightUnits: facts.lightUnits,
+      heavyMonth: monthLabel(facts.heavyMonth),
+      heavyUnits: facts.heavyUnits,
+      lastWeekRecharge: facts.lastWeekRecharge
+        ? `${facts.lastWeekRecharge.amount.toFixed(2)} BDT on ${facts.lastWeekRecharge.date}`
+        : 'None',
+      todayBalance: todayBalance ?? 0,
+      usualDailyUnits: parsedData.usual_daily_units,
+      runOutDate: predictions?.runOutDate,
+      targetDate,
+      amountNeededToday: predictions?.amountNeededToday,
+      breakdown: predictions?.breakdown,
+      habitWinner: habitResult?.winner ?? null,
+      habitDifference: habitResult?.difference ?? null,
+      lowBalanceCost: habitResult?.lowBalanceCost ?? null,
+      monthlyCost: habitResult?.monthlyCost ?? null,
+      slab,
+      daysUntilNextSlab: slabDays,
+      shop: shopAdvice,
+      weekendCoverAmount: weekendCover?.amountNeededToday ?? null,
+    })
+    downloadPlainText('meterwise-family-plan.txt', text)
+  }
 
   return (
     <div className="flex min-h-screen flex-col text-ink">
@@ -343,11 +389,11 @@ export default function App() {
           </div>
 
           <p className="text-sm text-muted">
-            Use the four tabs in order: load the family → read the line → answer the two questions →
-            compare habits.
+            Four required steps in order, then Plan: stay below the next tariff slab and recharge
+            before Friday if the meter would otherwise run out when shops are closed.
           </p>
 
-          <nav className="grid grid-cols-2 gap-2 md:grid-cols-4" aria-label="Sections">
+          <nav className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5" aria-label="Sections">
             {SECTIONS.map((item) => {
               const active = section === item.id
               return (
@@ -652,7 +698,111 @@ export default function App() {
                     </p>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setSection('plan')}
+                  className="mt-6 rounded-full bg-brand px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-dark"
+                >
+                  Next: Plan
+                </button>
               </div>
+            )}
+          </section>
+        ) : null}
+
+        {section === 'plan' ? (
+          <section className="rounded-3xl border border-line bg-surface p-6 shadow-sm sm:p-8">
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-brand-dark">
+              Bonus · not one of the four required items
+            </p>
+            <h2 className="font-display mt-2 text-3xl font-semibold tracking-tight">Stay-on plan</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+              Prepaid meters go dark the hour the balance hits zero, and many recharge shops close
+              Friday–Saturday. This page uses the same engine as the required tabs: how close this
+              month is to the next more expensive slab, and when to top up so the family is not
+              without power over the weekly holiday.
+            </p>
+            {!parsedData ? (
+              <div className="mt-6">
+                <NeedHousehold onGo={() => setSection('household')} />
+              </div>
+            ) : (
+              <>
+                <div className="mt-6 grid gap-4 md:grid-cols-2">
+                  <div className="rounded-2xl border border-line bg-canvas/80 p-5">
+                    <p className="text-sm font-medium">This month’s tariff slab</p>
+                    <p className="mt-1 text-xs text-muted">
+                      {todayRow?.monthRunningUnits ?? 0} units used so far this calendar month
+                    </p>
+                    <p className="mt-4 font-display text-2xl font-semibold">{slab.currentSlabLabel}</p>
+                    {slab.unitsLeftInSlab === null ? (
+                      <p className="mt-3 text-sm text-muted">Already on the highest published slab.</p>
+                    ) : (
+                      <dl className="mt-4 space-y-2 text-sm">
+                        <div className="flex justify-between gap-4">
+                          <dt className="text-muted">Units left in this slab</dt>
+                          <dd className="font-medium">{slab.unitsLeftInSlab}</dd>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <dt className="text-muted">Days at usual use until the next slab</dt>
+                          <dd className="font-medium">{slabDays ?? '—'}</dd>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <dt className="text-muted">Next slab</dt>
+                          <dd className="font-medium">{slab.nextSlabLabel}</dd>
+                        </div>
+                      </dl>
+                    )}
+                  </div>
+                  <div
+                    className={`rounded-2xl border p-5 ${
+                      shopAdvice.shopsLikelyClosed
+                        ? 'border-alert/20 bg-alert-soft'
+                        : 'border-brand/20 bg-brand-soft'
+                    }`}
+                  >
+                    <p className="text-sm font-medium">Friday–Saturday shop closure</p>
+                    <p className="mt-4 font-display text-2xl font-semibold text-ink">
+                      {shopAdvice.weekday
+                        ? `Run-out is ${shopAdvice.weekday}`
+                        : 'No run-out within a year'}
+                    </p>
+                    {shopAdvice.shopsLikelyClosed ? (
+                      <dl className="mt-4 space-y-2 text-sm">
+                        <div className="flex justify-between gap-4">
+                          <dt className="text-muted">Recharge by</dt>
+                          <dd>{formatLongDate(shopAdvice.rechargeByDate)}</dd>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <dt className="text-muted">Cover through</dt>
+                          <dd>{formatLongDate(shopAdvice.coverUntilDate)}</dd>
+                        </div>
+                        <div className="flex justify-between gap-4 border-t border-alert/20 pt-2">
+                          <dt className="text-muted">Amount today for those days</dt>
+                          <dd>{formatBdt(weekendCover?.amountNeededToday)}</dd>
+                        </div>
+                      </dl>
+                    ) : (
+                      <p className="mt-3 text-sm text-muted">
+                        Run-out is not on the weekly holiday. Still recharge before the balance hits
+                        zero — the meter cuts power the same day.
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <button
+                    type="button"
+                    onClick={handleDownloadPlan}
+                    className="rounded-full bg-brand px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-dark"
+                  >
+                    Download family plan
+                  </button>
+                  <p className="text-xs text-muted">
+                    Saves a plain-text file on this device. Nothing is uploaded.
+                  </p>
+                </div>
+              </>
             )}
           </section>
         ) : null}

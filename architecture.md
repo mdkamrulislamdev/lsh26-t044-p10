@@ -2,7 +2,7 @@
 
 Team **lsh26-t044** · Problem **p10** · Event start code **LSH26-8490-C900**
 
-This file is the full technical story of the Prepaid Meter Recharge Advisor: what each of the four required items does, how the code does it, the formulas, the challenges we hit, the edge cases we implemented, and how the work stays efficient. The UI has four tabs in order: **Household → Balance → Questions → Habits**. All money math lives in `src/billingEngine.ts`. The screen is `src/App.tsx`. There is no backend.
+This file is the full technical story of the Prepaid Meter Recharge Advisor: what each of the four required items does, how the code does it, the formulas, the challenges we hit, the edge cases we implemented, and how the work stays efficient. The UI has four required tabs in order: **Household → Balance → Questions → Habits**, then a bonus **Plan** tab. All money math lives in `src/billingEngine.ts`. The screen is `src/App.tsx`. There is no backend.
 
 ---
 
@@ -22,6 +22,10 @@ flowchart TD
   D --> G[Balance tab: line + recharge marks]
   E --> H[Questions tab: run-out date and amount today]
   F --> I[Habits tab: which costs less and by how much]
+  D --> J[Plan bonus: slab headroom]
+  E --> K[Plan bonus: Friday shop-closure advice]
+  J --> L[Download family plan text file]
+  K --> L
 ```
 
 ### One billing day
@@ -54,6 +58,19 @@ flowchart LR
   C --> W[Cheaper habit, or tie]
 ```
 
+### Stay-on plan (bonus)
+
+```mermaid
+flowchart TD
+  T[Today's month running units] --> S[getSlabPosition]
+  S --> U[Units left in this slab]
+  U --> D2[Days at usual use until next rate]
+  R[Run-out date] --> W{Friday or Saturday?}
+  W -->|yes| B[Recharge by Thursday]
+  B --> C[Amount to last through Sunday]
+  W -->|no| N[No holiday warning]
+```
+
 ---
 
 ## 2. Working flow (what a user does)
@@ -64,8 +81,9 @@ flowchart LR
 4. **Next: Balance** — line of daily balance; green marks are recharges; hover a mark.
 5. **Next: Questions** — run-out date; pick a date; see energy / higher slab / fixed charges / VAT.
 6. **Next: Habits** — same three months, same units; which costs less and by how much (or a tie).
+7. **Next: Plan** (bonus) — units left in this month’s slab; Friday–Saturday shop-closure recharge; optional download.
 
-If someone opens Balance / Questions / Habits before loading, the page says to start on Household.
+If someone opens Balance / Questions / Habits / Plan before loading, the page says to start on Household.
 
 ---
 
@@ -376,9 +394,11 @@ Built-in habit params: months Apr–Jun 2026, threshold 200, both amounts 2500, 
 | File | Role |
 |---|---|
 | `src/data/household.json` | Item 1 built-in six-month family |
-| `src/billingEngine.ts` | Slabs, `runSimulation`, `runPredictions`, `compareHabits` |
-| `src/App.tsx` | Four tabs, load/paste, chart, date picker, habit banner |
-| `test-runner.js` | 25 public cases + unit checks → `docs/test_report.json` (gitignored) |
+| `src/billingEngine.ts` | Slabs, simulation, predictions, habits, slab headroom, Friday shop-closure advice |
+| `src/App.tsx` | Required tabs + Plan bonus, load/paste, chart, date picker, habit banner, plan download |
+| `src/familyPlan.ts` | Plain-text family plan and local file download |
+| `test-runner.js` | Unit checks + 25 public cases; terminal PASS/FAIL report; `docs/test_report.json` (gitignored) |
+| `evaluation-manifest.json` | Judge pack: team, requirements, members, AI disclosure |
 | `EVENT.md` | Team ID, problem ID, start code, repo, SHA, live URL |
 | `LICENSES.md` | React, Recharts, Vite, Tailwind, fonts |
 | `MANUAL_CHECKLIST.md` | Human screen checks |
@@ -431,6 +451,7 @@ There is no backend, no auth, and no secrets in the repo.
 | XSS | Values render as React text, not HTML. |
 | Prototype pollution | Only named fields are read (`opening_balance_bdt`, `days`, …). |
 | Date injection | Display uses split `YYYY-MM-DD` / locale formatters, not raw HTML. |
+| Family plan download | `Blob` + `URL.createObjectURL` of engine text. Filename is fixed (`meterwise-family-plan.txt`). Nothing is uploaded. |
 
 ---
 
@@ -455,12 +476,13 @@ There is no backend, no auth, and no secrets in the repo.
 | 2. Day-by-day line + marks | Recharts step line; green recharge dots; 82 / VAT / slabs in engine |
 | 3. Two questions | Run-out card; date picker; four-line breakdown |
 | 4. Two habits | Banner + two billed costs; same months/units |
+| Bonus. Stay-on plan | Plan tab: slab headroom; Friday–Saturday shop advice; local text download |
 | R-16 same units / no slab trick | `compareHabits` one unit series; difference = 82 × count gap |
 | R-16 ties | Winner can be `Tie` |
 | R-33 cost ≠ deposit | Deposits never added to `cost` |
 | R-33 low vs monthly rules | `< threshold` at start of day; 1st of month; `comparison.opening_balance_bdt` |
 
-Automated: `npm run test:engine` (unit checks + PUB-01 … PUB-25).
+Automated: `npm test` (unit checks + PUB-01 … PUB-25, PASS/FAIL in the terminal).
 
 ---
 
@@ -471,6 +493,7 @@ Automated: `npm run test:engine` (unit checks + PUB-01 … PUB-25).
 - Paste of `{ "cases": [...] }` uses the first case only.
 - Refresh clears the loaded household (no login, no database).
 - Higher-slab line is energy minus first-slab rate, not a separate bill item.
+- Family plan is a local text file; it is not emailed or stored remotely.
 - Live URL and demo video must be filled for the arena form (see `EVENT.md` / README).
 
 ---
@@ -487,7 +510,7 @@ Automated: `npm run test:engine` (unit checks + PUB-01 … PUB-25).
 ## 15. Major decisions
 
 1. **Browser-only engine** so judges can run the live URL with no server.
-2. **Four tabs, not a dashboard of everything at once** so each required item is a clear step.
+2. **Four required tabs, plus a labelled Plan bonus** so each scored item is a clear step and the extra feature cannot be mistaken for a required item.
 3. **Cost ≠ deposit** even when the UI shows large top-up amounts.
 4. **String dates and two-decimal taka** so the 1st and paisa stay stable.
-5. **Tests against the public pack** so clarifications R-16 and R-33 stay true on 25 cases, not only the built-in household.
+5. **Tests against the public pack** so clarifications R-16 and R-33 stay true on 25 cases, not only the built-in household. `npm test` prints which checks passed and which failed.

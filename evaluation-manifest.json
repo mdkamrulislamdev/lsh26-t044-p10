@@ -1,0 +1,84 @@
+{
+  "team_id": "LSH26-T044",
+  "problem_id": "P10",
+  "repository_name": "lsh26-t044-p10",
+  "live_url": "https://p1-nine-kappa.vercel.app/",
+  "demo_video_url_optional": "",
+  "event_start_code": "LSH26-8490-C900",
+  "repository_created_before_release": true,
+  "pre_event_materials": [
+    "Vite official React + TypeScript app template (index.html, Vite config, npm run dev). Not a prebuilt P10 solution."
+  ],
+  "sample_data": {
+    "loads_published_fixture": true,
+    "method": "Household tab: click Load 6-month household for src/data/household.json (same schema as the published pack). Judges may also paste a published case into the textarea and click Load pasted JSON.",
+    "reset_instructions": "Refresh the browser, or click Load 6-month household again. Nothing is stored on a server. There is no login and no database."
+  },
+  "problem_solving_method": "All taka math lives in one browser engine (src/billingEngine.ts). The UI only displays engine results. The four required P10 items are four tabs in problem order. Dates stay YYYY-MM-DD strings so the 1st of the month does not shift in UTC. Habit cost is energy + VAT + ৳82, never the deposit (R-33). Both habits use the same daily units (R-16). A fifth tab, Plan, is a bonus: slab headroom this month and a Friday–Saturday shop-closure recharge so the family does not go dark when shops are closed.",
+  "requirements": {
+    "R1": {
+      "status": "complete",
+      "evidence": "Household tab. Button Load 6-month household → src/data/household.json (HH-DHAKA-01, Jan–Jun 2026, light January, heavy May, ৳5000 on 2026-06-28). src/App.tsx summarizeHousehold."
+    },
+    "R2": {
+      "status": "complete",
+      "evidence": "Balance tab. Recharts day-by-day line with green recharge marks. Engine: src/billingEngine.ts runSimulation (slabs, ৳82 on first recharge of the calendar month, 5% VAT on energy only)."
+    },
+    "R3": {
+      "status": "complete",
+      "evidence": "Questions tab. Run-out date at usual daily use; date picker for amount to recharge today, split into energy, higher slab, fixed charges, VAT. src/billingEngine.ts runPredictions."
+    },
+    "R4": {
+      "status": "complete",
+      "evidence": "Habits tab. Same comparison.months and same units. Low balance vs 1st of month. Cost is energy+VAT+৳82, not deposits. Ties allowed. src/billingEngine.ts compareHabits."
+    },
+    "R5": {
+      "status": "complete",
+      "evidence": "Bonus Plan tab (not one of the four scored items). Slab headroom + Friday–Saturday shop-closure advice + Download family plan. src/billingEngine.ts getSlabPosition / adviseClosedShopRecharge; src/familyPlan.ts; src/App.tsx Plan section."
+    }
+  },
+  "team_members": [
+    {
+      "registered_name": "Kamrul",
+      "github_username": "mdkamrulislamdev",
+      "major_contribution": "Product: four required tabs, household JSON, billing engine (slabs, simulation, predictions, habits), stay-on Plan bonus, engine tests, README / licenses / architecture / evaluation-manifest, live deploy.",
+      "evidence_paths_or_commits": [
+        "src/billingEngine.ts",
+        "src/App.tsx",
+        "src/familyPlan.ts",
+        "src/data/household.json",
+        "test-runner.js",
+        "evaluation-manifest.json",
+        "26f365d",
+        "1e1dba1",
+        "25934b7",
+        "7f81dc2"
+      ]
+    }
+  ],
+  "major_design_decisions": [
+    "Browser-only engine so the live URL needs no server.",
+    "Four required tabs in problem order, plus a clearly labelled Plan bonus tab.",
+    "Habit cost is billed energy + VAT + ৳82, never the deposit amount (R-33).",
+    "String dates and two-decimal taka so the 1st of the month and paisa stay stable.",
+    "npm test runs every public case and prints PASS/FAIL plus a summary in the terminal."
+  ],
+  "known_limitations": [
+    "No live DESCO/NESCO meter API.",
+    "Rates are the problem pack table, not a live circular lookup.",
+    "A { \"cases\": [...] } paste uses the first case only.",
+    "Refreshing the page clears the loaded household (no login, no database).",
+    "Higher-slab line is energy minus (units × 4.63), not a separate billed fee.",
+    "Demo video URL is empty until the recording is uploaded.",
+    "Family plan download is a local text file; it is not emailed or stored remotely."
+  ],
+  "ai_tools_used": [
+    {
+      "tool": "Cursor",
+      "used_for": "Drafting TypeScript UI, billing-engine helpers, tests, architecture, README, and this manifest.",
+      "how_output_was_verified": "Official tariff constants were copied from the problem pack and must not change. Behaviour was checked with npm test (unit checks plus all public cases), tsc, oxlint, and vite build. R-16 and R-33 are asserted in test-runner.js."
+    }
+  ],
+  "licenses_file": "LICENSES.md",
+  "declaration": "The information above is complete and truthful to the best of the team's knowledge."
+}

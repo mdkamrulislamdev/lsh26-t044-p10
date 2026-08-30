@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
+    "test": "tsx test-runner.js",
     "test:engine": "tsx test-runner.js"
   },
   "dependencies": {

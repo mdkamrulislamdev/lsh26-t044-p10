@@ -1,23 +1,28 @@
 /**
  * Automated billing-engine test runner (P10).
- * Reads docs/P10_prepaid_meter_public.json, runs every case, writes docs/test_report.json.
+ * Reads docs/P10_prepaid_meter_public.json, runs every case, prints a pass/fail
+ * report in the terminal, and writes docs/test_report.json.
  *
+ *   npm test
  *   npm run test:engine
- *   npx tsx test-runner.js
  */
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import {
+  adviseClosedShopRecharge,
   calculateEnergyCost,
   calendarMonthKey,
   compareHabits,
+  daysUntilNextSlab,
   FIXED_CHARGES,
+  getSlabPosition,
   roundTaka,
   runPredictions,
   runSimulation,
   VAT_RATE,
 } from './src/billingEngine.ts'
+import { buildFamilyPlanText } from './src/familyPlan.ts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const inputPath = path.join(__dirname, 'docs', 'P10_prepaid_meter_public.json')
@@ -130,6 +135,76 @@ function runUnitChecks() {
         )
       })(),
       detail: 'High opening balance never trips the threshold; monthly still pays 82 on the 1st',
+    },
+    {
+      name: 'slab_headroom_before_75',
+      pass: (() => {
+        const slab = getSlabPosition(70)
+        return (
+          almost(slab.currentRate, 4.63) &&
+          almost(slab.unitsLeftInSlab, 5) &&
+          almost(slab.nextRate, 5.26) &&
+          daysUntilNextSlab(5, 2) === 3
+        )
+      })(),
+      detail: '70 units this month → 5 units left at 4.63, then 5.26',
+    },
+    {
+      name: 'slab_headroom_after_exactly_75',
+      pass: (() => {
+        const slab = getSlabPosition(75)
+        return almost(slab.currentRate, 5.26) && almost(slab.unitsLeftInSlab, 125)
+      })(),
+      detail: 'After 75 units the next unit is already slab 2',
+    },
+    {
+      name: 'friday_shop_closure_advice',
+      pass: (() => {
+        const friday = adviseClosedShopRecharge('2026-07-03')
+        const thursday = adviseClosedShopRecharge('2026-07-02')
+        return (
+          friday.weekday === 'Friday' &&
+          friday.shopsLikelyClosed &&
+          friday.rechargeByDate === '2026-07-02' &&
+          friday.coverUntilDate === '2026-07-05' &&
+          thursday.shopsLikelyClosed === false
+        )
+      })(),
+      detail: '2026-07-03 is Friday; recharge by Thursday and cover through Sunday',
+    },
+    {
+      name: 'family_plan_text_is_plain',
+      pass: (() => {
+        const text = buildFamilyPlanText({
+          generatedOn: '2026-06-30',
+          monthCount: 6,
+          lightMonth: 'January 2026',
+          lightUnits: 1,
+          heavyMonth: 'May 2026',
+          heavyUnits: 2,
+          lastWeekRecharge: '5000.00 BDT on 2026-06-28',
+          todayBalance: 100,
+          usualDailyUnits: 14,
+          runOutDate: '2026-07-03',
+          targetDate: '2026-07-25',
+          amountNeededToday: 10,
+          breakdown: { energy: 8, vat: 0.4, fixedCharges: 0, slabPenalty: 1 },
+          habitWinner: 'Tie',
+          habitDifference: 0,
+          lowBalanceCost: 1,
+          monthlyCost: 1,
+          slab: getSlabPosition(70),
+          daysUntilNextSlab: 3,
+          shop: adviseClosedShopRecharge('2026-07-03'),
+          weekendCoverAmount: 20,
+        })
+        return (
+          text.includes('Stay-on plan') &&
+          text.includes('Recharge by 2026-07-02') &&
+          !text.includes('<')
+        )
+      })(),
+      detail: 'Downloaded plan is plain text with slab and Friday advice',
     },
   ]
   return {
@@ -271,7 +346,73 @@ function collectCaseIssues(testCase, simulationResult, predictions, comparison) 
   return issues
 }
 
-console.log('Starting automated test runner...')
+function mark(pass) {
+  return pass ? 'PASS' : 'FAIL'
+}
+
+function printReport(report) {
+  const line = '='.repeat(64)
+  const thin = '-'.repeat(64)
+  console.log('')
+  console.log(line)
+  console.log('MeterWise billing engine — test report')
+  console.log(line)
+  console.log(`Generated: ${report.generated_at}`)
+  console.log('')
+  console.log('Unit checks')
+  console.log(thin)
+  report.unit_checks.checks.forEach((check) => {
+    console.log(`  ${mark(check.pass).padEnd(4)}  ${check.name}`)
+    if (!check.pass) console.log(`          ${check.detail}`)
+  })
+  console.log(
+    `  ${report.unit_checks.passed} passed, ${report.unit_checks.failed} failed (${report.unit_checks.checks.length} total)`,
+  )
+  console.log('')
+  console.log('Public cases')
+  console.log(thin)
+  report.results.forEach((result) => {
+    const label = result.status === 'SUCCESS' ? 'PASS' : result.status
+    console.log(`  ${label.padEnd(7)}  ${result.case_id}`)
+    if (result.status !== 'SUCCESS' && result.issues?.length) {
+      result.issues.forEach((issue) => console.log(`          - ${issue}`))
+    }
+  })
+  console.log(
+    `  ${report.summary.passed} passed, ${report.summary.failed} failed (${report.total_cases_run} total)`,
+  )
+  console.log('')
+  console.log('Summary')
+  console.log(thin)
+  const unitTotal = report.unit_checks.checks.length
+  const caseTotal = report.total_cases_run
+  const allPassed = report.unit_checks.failed === 0 && report.summary.failed === 0
+  console.log(
+    `  Unit checks : ${report.unit_checks.passed}/${unitTotal} passed`,
+  )
+  console.log(`  Public cases: ${report.summary.passed}/${caseTotal} passed`)
+  if (report.summary.failed > 0) {
+    const failedIds = report.results
+      .filter((row) => row.status !== 'SUCCESS')
+      .map((row) => row.case_id)
+      .join(', ')
+    console.log(`  Failed cases: ${failedIds}`)
+  }
+  console.log(`  Overall     : ${allPassed ? 'ALL PASSED' : 'FAILED'}`)
+  console.log(`  JSON report : ${outputPath}`)
+  console.log(line)
+  console.log('')
+}
+
+if (!fs.existsSync(inputPath)) {
+  console.error('Missing published fixture:')
+  console.error(`  ${inputPath}`)
+  console.error('Copy P10_prepaid_meter_public.json from the problem pack into docs/ then run:')
+  console.error('  npm test')
+  process.exit(1)
+}
+
+console.log('Running MeterWise engine tests...')
 
 try {
   const rawData = fs.readFileSync(inputPath, 'utf8')
@@ -291,7 +432,6 @@ try {
   }
 
   testData.cases.forEach((testCase) => {
-    console.log(`Processing ${testCase.case_id}...`)
 
     try {
       const simulationResult = runSimulation(
@@ -365,9 +505,7 @@ try {
 
   fs.mkdirSync(path.dirname(outputPath), { recursive: true })
   fs.writeFileSync(outputPath, JSON.stringify(report, null, 2))
-  console.log(`Unit checks: ${unit_checks.passed} passed, ${unit_checks.failed} failed`)
-  console.log(`Cases: ${report.summary.passed} passed, ${report.summary.failed} failed`)
-  console.log(`Report saved to: ${outputPath}`)
+  printReport(report)
 
   if (unit_checks.failed > 0 || report.summary.failed > 0) {
     process.exitCode = 1

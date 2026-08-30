@@ -33,7 +33,7 @@ Recharts pulls in MIT-licensed helpers (including `clsx`, `decimal.js-light`, an
 | [tailwindcss](https://www.npmjs.com/package/tailwindcss) | MIT | CSS |
 | [@tailwindcss/vite](https://www.npmjs.com/package/@tailwindcss/vite) | MIT | Tailwind Vite plugin |
 | [typescript](https://www.npmjs.com/package/typescript) | Apache-2.0 | Types |
-| [tsx](https://www.npmjs.com/package/tsx) | MIT | `npm run test:engine` |
+| [tsx](https://www.npmjs.com/package/tsx) | MIT | `npm test` / `npm run test:engine` |
 | [oxlint](https://www.npmjs.com/package/oxlint) | MIT | Lint |
 | [@types/node](https://www.npmjs.com/package/@types/node) | MIT | Types |
 | [@types/react](https://www.npmjs.com/package/@types/react) | MIT | Types |
@@ -62,7 +62,8 @@ No Lucide, Heroicons, Font Awesome, or image stock. No `hero.png`.
 | Asset | License / source | Use |
 |---|---|---|
 | `src/data/household.json` | Original (this team) | Built-in six-month Dhaka household |
-| `docs/P10_prepaid_meter_public.json` | Problem pack (gitignored) | Local `npm run test:engine` only |
+| `docs/P10_prepaid_meter_public.json` | Problem pack (gitignored) | Local `npm test` only |
+| `evaluation-manifest.json` | Original (this team) | Judge evaluation pack |
 
 ## Hosting
 

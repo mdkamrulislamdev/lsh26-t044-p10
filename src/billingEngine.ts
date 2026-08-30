@@ -384,3 +384,132 @@ export function compareHabits(
     monthlyFixedCharges: monthly.fixedCharges,
   }
 }
+
+export type SlabPosition = {
+  monthRunningUnits: number
+  currentRate: number
+  currentSlabLabel: string
+  unitsLeftInSlab: number | null
+  nextRate: number | null
+  nextSlabLabel: string | null
+}
+
+export type ClosedShopAdvice = {
+  runOutDate: string | null
+  weekday: string | null
+  shopsLikelyClosed: boolean
+  rechargeByDate: string | null
+  coverUntilDate: string | null
+}
+
+const WEEKDAY_NAMES = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+] as const
+
+function weekdayIndex(isoDate: string): number {
+  const [year, month, day] = isoDate.split('-').map(Number)
+  return new Date(year, month - 1, day).getDay()
+}
+
+function slabRangeLabel(fromExclusive: number, limit: number, rate: number): string {
+  const lower = fromExclusive === 0 ? 1 : fromExclusive + 1
+  if (!Number.isFinite(limit)) return `${lower}+ units @ ${rate.toFixed(2)}`
+  return `${lower}–${limit} units @ ${rate.toFixed(2)}`
+}
+
+/**
+ * Where this month's running units sit on the official tariff.
+ * After exactly 75 units the next unit is already in slab 2.
+ */
+export function getSlabPosition(monthRunningUnits: number): SlabPosition {
+  const units = Math.max(0, monthRunningUnits)
+  let previousLimit = 0
+
+  for (let index = 0; index < TARIFF_SLABS.length; index += 1) {
+    const slab = TARIFF_SLABS[index]
+    const inThisSlab = !Number.isFinite(slab.limit) || units < slab.limit
+    if (!inThisSlab) {
+      previousLimit = slab.limit
+      continue
+    }
+
+    const next = TARIFF_SLABS[index + 1]
+    const unitsLeftInSlab = Number.isFinite(slab.limit) ? slab.limit - units : null
+    return {
+      monthRunningUnits: units,
+      currentRate: slab.rate,
+      currentSlabLabel: slabRangeLabel(previousLimit, slab.limit, slab.rate),
+      unitsLeftInSlab,
+      nextRate: next ? next.rate : null,
+      nextSlabLabel: next
+        ? slabRangeLabel(slab.limit === Infinity ? previousLimit : slab.limit, next.limit, next.rate)
+        : null,
+    }
+  }
+
+  const last = TARIFF_SLABS[TARIFF_SLABS.length - 1]
+  const lastFinite = TARIFF_SLABS[TARIFF_SLABS.length - 2]
+  return {
+    monthRunningUnits: units,
+    currentRate: last.rate,
+    currentSlabLabel: slabRangeLabel(lastFinite.limit, last.limit, last.rate),
+    unitsLeftInSlab: null,
+    nextRate: null,
+    nextSlabLabel: null,
+  }
+}
+
+export function daysUntilNextSlab(
+  unitsLeftInSlab: number | null,
+  usualDailyUnits: number,
+): number | null {
+  if (unitsLeftInSlab === null || usualDailyUnits <= 0) return null
+  return Math.ceil(unitsLeftInSlab / usualDailyUnits)
+}
+
+/**
+ * Friday and Saturday are the usual weekly holidays in Bangladesh.
+ * If run-out falls on one of those days, recharge by Thursday and cover through Sunday.
+ */
+export function adviseClosedShopRecharge(runOutDate: string | null): ClosedShopAdvice {
+  if (!runOutDate) {
+    return {
+      runOutDate: null,
+      weekday: null,
+      shopsLikelyClosed: false,
+      rechargeByDate: null,
+      coverUntilDate: null,
+    }
+  }
+
+  const day = weekdayIndex(runOutDate)
+  const weekday = WEEKDAY_NAMES[day]
+  const shopsLikelyClosed = day === 5 || day === 6
+
+  if (!shopsLikelyClosed) {
+    return {
+      runOutDate,
+      weekday,
+      shopsLikelyClosed: false,
+      rechargeByDate: null,
+      coverUntilDate: null,
+    }
+  }
+
+  const daysBackToThursday = day === 5 ? 1 : 2
+  const daysForwardToSunday = day === 5 ? 2 : 1
+
+  return {
+    runOutDate,
+    weekday,
+    shopsLikelyClosed: true,
+    rechargeByDate: addCalendarDays(runOutDate, -daysBackToThursday),
+    coverUntilDate: addCalendarDays(runOutDate, daysForwardToSunday),
+  }
+}
