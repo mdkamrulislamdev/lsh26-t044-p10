@@ -196,6 +196,14 @@ export type ComparisonConfig = {
   low_threshold_bdt: string | number
   low_amount_bdt: string | number
   monthly_amount_bdt: string | number
+  source?: string
+  daily_units?: number | null
+}
+
+export type HabitTotals = {
+  cost: number
+  energyAndVat: number
+  fixedCharges: number
 }
 
 export type HabitComparisonResult = {
@@ -203,6 +211,9 @@ export type HabitComparisonResult = {
   monthlyCost: number
   winner: 'Low Balance' | 'Monthly' | 'Tie'
   difference: number
+  energyAndVat: number
+  lowBalanceFixedCharges: number
+  monthlyFixedCharges: number
 }
 
 function addCalendarDays(isoDate: string, days: number): string {
@@ -303,7 +314,10 @@ export function runPredictions(
 
 /**
  * PHASE 10: Habit Comparison
- * Runs the consumption data through two different recharge rules.
+ * Same three months, same daily units and slab counter. Cost is energy + 5% VAT +
+ * ৳82 on the first recharge of a calendar month — not the money deposited.
+ * Low balance: top up at the start of the day when balance is below the threshold.
+ * Monthly: top up on the 1st of each month.
  */
 export function compareHabits(
   days: SimulationDay[],
@@ -315,19 +329,23 @@ export function compareHabits(
     low_threshold_bdt,
     low_amount_bdt,
     monthly_amount_bdt,
+    daily_units,
   } = comparisonConfig
 
-  const simulationDays = days.filter((day) => {
-    const dayMonth = day.date.substring(0, 7)
-    return months.includes(dayMonth)
-  })
+  const constantUnits =
+    typeof daily_units === 'number' && Number.isFinite(daily_units) ? daily_units : null
 
-  const simulate = (isMonthlyHabit: boolean) => {
+  const simulationDays = days
+    .filter((day) => months.includes(day.date.substring(0, 7)))
+    .map((day) => (constantUnits === null ? day : { ...day, units: constantUnits }))
+
+  const simulate = (isMonthlyHabit: boolean): HabitTotals => {
     let balance = parseFloat(String(opening_balance_bdt))
     let currentMonth: string | null = null
     let monthRunningUnits = 0
     let hasPaidFixedChargesThisMonth = false
-    let totalCost = 0
+    let energyAndVat = 0
+    let fixedChargesTotal = 0
 
     simulationDays.forEach((day) => {
       const monthKey = calendarMonthKey(day.date)
@@ -350,7 +368,7 @@ export function compareHabits(
       if (triggeredRecharge && !hasPaidFixedChargesThisMonth) {
         const fixedCharges = METER_RENT + DEMAND_CHARGE
         balance -= fixedCharges
-        totalCost += fixedCharges
+        fixedChargesTotal = roundTaka(fixedChargesTotal + fixedCharges)
         hasPaidFixedChargesThisMonth = true
       }
 
@@ -359,15 +377,21 @@ export function compareHabits(
       const dailyConsumptionCost = roundTaka(energyCost + vat)
 
       balance -= dailyConsumptionCost
-      totalCost += dailyConsumptionCost
+      energyAndVat = roundTaka(energyAndVat + dailyConsumptionCost)
       monthRunningUnits += day.units
     })
 
-    return totalCost
+    return {
+      cost: roundTaka(energyAndVat + fixedChargesTotal),
+      energyAndVat,
+      fixedCharges: fixedChargesTotal,
+    }
   }
 
-  const lowBalanceCost = parseFloat(simulate(false).toFixed(2))
-  const monthlyCost = parseFloat(simulate(true).toFixed(2))
+  const low = simulate(false)
+  const monthly = simulate(true)
+  const lowBalanceCost = low.cost
+  const monthlyCost = monthly.cost
 
   return {
     lowBalanceCost,
@@ -378,6 +402,9 @@ export function compareHabits(
         : monthlyCost < lowBalanceCost
           ? 'Monthly'
           : 'Tie',
-    difference: parseFloat(Math.abs(lowBalanceCost - monthlyCost).toFixed(2)),
+    difference: roundTaka(Math.abs(lowBalanceCost - monthlyCost)),
+    energyAndVat: low.energyAndVat,
+    lowBalanceFixedCharges: low.fixedCharges,
+    monthlyFixedCharges: monthly.fixedCharges,
   }
 }

@@ -14,6 +14,7 @@ import {
   compareHabits,
   DEMAND_CHARGE,
   METER_RENT,
+  roundTaka,
   runPredictions,
   runSimulation,
   VAT_MULTIPLIER,
@@ -28,6 +29,31 @@ const EPS = 1e-6
 
 function almost(a, b, eps = EPS) {
   return Math.abs(a - b) <= eps
+}
+
+function expectedHabitEnergyVat(days, months, dailyUnits) {
+  const constantUnits =
+    typeof dailyUnits === 'number' && Number.isFinite(dailyUnits) ? dailyUnits : null
+  let total = 0
+  let currentMonth = null
+  let monthRunningUnits = 0
+
+  days
+    .filter((day) => months.includes(day.date.substring(0, 7)))
+    .forEach((day) => {
+      const units = constantUnits === null ? day.units : constantUnits
+      const monthKey = calendarMonthKey(day.date)
+      if (currentMonth !== monthKey) {
+        currentMonth = monthKey
+        monthRunningUnits = 0
+      }
+      const energy = calculateEnergyCost(units, monthRunningUnits)
+      const vat = roundTaka(energy * VAT_MULTIPLIER)
+      total = roundTaka(total + roundTaka(energy + vat))
+      monthRunningUnits += units
+    })
+
+  return total
 }
 
 function runUnitChecks() {
@@ -51,6 +77,60 @@ function runUnitChecks() {
       name: 'cross_200',
       pass: almost(calculateEnergyCost(10, 195), 5 * 5.26 + 5 * 5.63),
       detail: '195 + 10 units splits across 200 boundary',
+    },
+    {
+      name: 'habits_cost_excludes_deposits_and_can_tie',
+      pass: (() => {
+        const result = compareHabits(
+          [
+            { date: '2026-01-01', units: 5 },
+            { date: '2026-01-02', units: 5 },
+          ],
+          {
+            months: ['2026-01'],
+            opening_balance_bdt: '0.00',
+            low_threshold_bdt: '100.00',
+            low_amount_bdt: '2000.00',
+            monthly_amount_bdt: '2000.00',
+          },
+        )
+        return (
+          result.winner === 'Tie' &&
+          almost(result.difference, 0) &&
+          almost(result.lowBalanceCost, result.monthlyCost) &&
+          result.lowBalanceCost < 2000 &&
+          almost(result.lowBalanceFixedCharges, FIXED) &&
+          almost(result.monthlyFixedCharges, FIXED)
+        )
+      })(),
+      detail: 'Same units → same energy; cost is energy+VAT+82, not the 2000 deposit',
+    },
+    {
+      name: 'habits_low_balance_can_skip_a_month_of_82',
+      pass: (() => {
+        const result = compareHabits(
+          [
+            { date: '2026-01-01', units: 1 },
+            { date: '2026-01-02', units: 1 },
+          ],
+          {
+            months: ['2026-01'],
+            opening_balance_bdt: '5000.00',
+            low_threshold_bdt: '100.00',
+            low_amount_bdt: '2000.00',
+            monthly_amount_bdt: '2000.00',
+          },
+        )
+        return (
+          result.winner === 'Low Balance' &&
+          almost(result.difference, FIXED) &&
+          almost(result.lowBalanceFixedCharges, 0) &&
+          almost(result.monthlyFixedCharges, FIXED) &&
+          almost(result.lowBalanceCost, result.energyAndVat) &&
+          almost(result.monthlyCost, result.energyAndVat + FIXED)
+        )
+      })(),
+      detail: 'High opening balance never trips the threshold; monthly still pays 82 on the 1st',
     },
   ]
   return {
@@ -140,13 +220,52 @@ function collectCaseIssues(testCase, simulationResult, predictions, comparison) 
     }
   }
 
-  if (comparison) {
+  if (comparison && testCase.comparison) {
+    const months = testCase.comparison.months
+    const dailyUnits = testCase.comparison.daily_units
+    const expectedEnergyVat = expectedHabitEnergyVat(testCase.days, months, dailyUnits)
+
+    if (!almost(comparison.energyAndVat, expectedEnergyVat, 0.05)) {
+      issues.push(
+        `Habit energy+VAT ${comparison.energyAndVat} does not match independent rebuild ${expectedEnergyVat}`,
+      )
+    }
+    if (!almost(comparison.lowBalanceCost, comparison.energyAndVat + comparison.lowBalanceFixedCharges, 0.02)) {
+      issues.push(
+        `Low-balance cost ${comparison.lowBalanceCost} is not energy+VAT plus fixed charges`,
+      )
+    }
+    if (!almost(comparison.monthlyCost, comparison.energyAndVat + comparison.monthlyFixedCharges, 0.02)) {
+      issues.push(
+        `Monthly cost ${comparison.monthlyCost} is not energy+VAT plus fixed charges`,
+      )
+    }
+
+    const expectedDiff = roundTaka(
+      Math.abs(comparison.lowBalanceFixedCharges - comparison.monthlyFixedCharges),
+    )
+    if (!almost(comparison.difference, expectedDiff, 0.02)) {
+      issues.push(
+        `Habit difference ${comparison.difference} is not the gap in ৳82 counts (${expectedDiff})`,
+      )
+    }
+
     const steps = Math.round(comparison.difference / FIXED)
     const reconstructed = parseFloat((steps * FIXED).toFixed(2))
     if (!almost(comparison.difference, reconstructed, 0.02)) {
       issues.push(
         `Habit cost difference ${comparison.difference} is not a multiple of ${FIXED} (energy should be identical).`,
       )
+    }
+
+    if (almost(comparison.difference, 0, 0.02) && comparison.winner !== 'Tie') {
+      issues.push(`Equal billed costs should be a Tie, got ${comparison.winner}`)
+    }
+    if (comparison.lowBalanceCost < comparison.monthlyCost - 0.02 && comparison.winner !== 'Low Balance') {
+      issues.push(`Low-balance is cheaper but winner is ${comparison.winner}`)
+    }
+    if (comparison.monthlyCost < comparison.lowBalanceCost - 0.02 && comparison.winner !== 'Monthly') {
+      issues.push(`Monthly is cheaper but winner is ${comparison.winner}`)
     }
   }
 
@@ -229,6 +348,9 @@ try {
           comparison_low_balance_cost: comparison ? comparison.lowBalanceCost : 'N/A',
           comparison_monthly_cost: comparison ? comparison.monthlyCost : 'N/A',
           comparison_cost_difference: comparison ? comparison.difference : 'N/A',
+          comparison_energy_and_vat: comparison ? comparison.energyAndVat : 'N/A',
+          comparison_low_fixed: comparison ? comparison.lowBalanceFixedCharges : 'N/A',
+          comparison_monthly_fixed: comparison ? comparison.monthlyFixedCharges : 'N/A',
         },
       })
     } catch (error) {

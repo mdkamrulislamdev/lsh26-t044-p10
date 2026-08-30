@@ -12,6 +12,8 @@ import {
 import {
   calendarMonthKey,
   compareHabits,
+  DEMAND_CHARGE,
+  METER_RENT,
   runPredictions,
   runSimulation,
   type SimulationPoint,
@@ -36,6 +38,8 @@ type ComparisonParams = {
   low_amount_bdt: string | number
   low_threshold_bdt: string | number
   monthly_amount_bdt: string | number
+  source?: string
+  daily_units?: number | null
 }
 
 type ParsedData = {
@@ -69,6 +73,8 @@ function parseComparison(value: unknown): ComparisonParams | undefined {
     low_amount_bdt: value.low_amount_bdt as string | number,
     low_threshold_bdt: value.low_threshold_bdt as string | number,
     monthly_amount_bdt: value.monthly_amount_bdt as string | number,
+    source: typeof value.source === 'string' ? value.source : undefined,
+    daily_units: typeof value.daily_units === 'number' ? value.daily_units : null,
   }
 }
 
@@ -221,9 +227,15 @@ export default function App() {
   }, [parsedData])
 
   const comparison = parsedData?.comparison
-  const monthCount = comparison?.months.length || 3
+  const monthsLabel = comparison?.months.join(' · ') ?? ''
   const monthlyWins = habitResult?.winner === 'Monthly'
   const lowWins = habitResult?.winner === 'Low Balance'
+  const isTie = habitResult?.winner === 'Tie'
+  const fixedCharge = METER_RENT + DEMAND_CHARGE
+  const fixedSteps =
+    habitResult && habitResult.difference > 0
+      ? Math.round(habitResult.difference / fixedCharge)
+      : 0
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 font-sans text-slate-900">
@@ -441,15 +453,52 @@ export default function App() {
           </div>
 
           <div className="flex min-h-[200px] flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-sm font-bold uppercase tracking-wider text-slate-500">
-              Habit Comparison: 3-Month Simulation
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500">
+              Two recharge habits
             </h2>
+            <p className="mb-4 mt-1 text-xs leading-5 text-slate-500">
+              Same three months, same daily units and slab counter. Cost is energy + 5% VAT + ৳82
+              on the first recharge of a calendar month — not the money deposited.
+              {comparison ? ` Window: ${monthsLabel}.` : ''}
+            </p>
             {!parsedData ? (
               <div className="flex flex-1 items-center justify-center rounded-lg bg-slate-50/50 text-sm text-slate-400">
-                Load data to run simulation.
+                Load data to compare habits.
+              </div>
+            ) : !habitResult ? (
+              <div className="flex flex-1 items-center justify-center rounded-lg bg-slate-50/50 text-sm text-slate-400">
+                This case has no comparison months.
               </div>
             ) : (
-              <div className="flex flex-1 flex-col gap-4 md:flex-row">
+              <div className="flex flex-1 flex-col gap-4">
+                <div
+                  className={`rounded-lg border p-4 ${
+                    isTie
+                      ? 'border-slate-200 bg-slate-50'
+                      : 'border-emerald-200 bg-emerald-50'
+                  }`}
+                >
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Which costs less
+                  </p>
+                  <p
+                    className={`mt-1 text-lg font-bold ${
+                      isTie ? 'text-slate-800' : 'text-emerald-800'
+                    }`}
+                  >
+                    {isTie
+                      ? `Tie — both cost ${formatBdt(habitResult.lowBalanceCost)}`
+                      : lowWins
+                        ? `Low-balance costs less by ${formatBdt(habitResult.difference)}`
+                        : `Start-of-month costs less by ${formatBdt(habitResult.difference)}`}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-600">
+                    {isTie
+                      ? 'They paid meter rent + demand the same number of times. A tie is allowed.'
+                      : `That gap is ${fixedSteps} × ৳82 (rent + demand), not extra electricity. Shared energy + VAT: ${formatBdt(habitResult.energyAndVat)}.`}
+                  </p>
+                </div>
+                <div className="flex flex-1 flex-col gap-4 md:flex-row">
                 <div
                   className={`relative flex-1 overflow-hidden rounded-lg border p-4 ${
                     lowWins
@@ -459,29 +508,28 @@ export default function App() {
                 >
                   {lowWins ? (
                     <div className="absolute top-0 right-0 rounded-bl-lg bg-emerald-500 px-3 py-1 text-xs font-bold text-white">
-                      WINNER
+                      COSTS LESS
+                    </div>
+                  ) : null}
+                  {isTie ? (
+                    <div className="absolute top-0 right-0 rounded-bl-lg bg-slate-500 px-3 py-1 text-xs font-bold text-white">
+                      TIE
                     </div>
                   ) : null}
                   <h3 className={`mb-1 font-bold ${lowWins ? 'text-emerald-900' : 'text-slate-800'}`}>
-                    &quot;Low Balance&quot; Habit
+                    When the balance runs low
                   </h3>
                   <p className={`mb-4 text-xs ${lowWins ? 'text-emerald-700/70' : 'text-slate-500'}`}>
-                    Recharge {comparison?.low_amount_bdt ?? '—'} BDT when balance drops below{' '}
-                    {comparison?.low_threshold_bdt ?? '—'} BDT.
+                    At the start of the day, if balance is below {comparison?.low_threshold_bdt ?? '—'}{' '}
+                    BDT, recharge {comparison?.low_amount_bdt ?? '—'} BDT.
                   </p>
+                  <p className="mb-1 text-xs uppercase tracking-wide text-slate-500">Billed cost</p>
                   <div className={`mb-1 text-3xl font-bold ${lowWins ? 'text-emerald-700' : 'text-slate-800'}`}>
-                    {formatBdt(habitResult?.lowBalanceCost ?? 0)}
+                    {formatBdt(habitResult.lowBalanceCost)}
                   </div>
-                  <p
-                    className={`text-sm font-medium ${
-                      monthlyWins ? 'text-red-500' : lowWins ? 'text-emerald-600' : 'text-slate-500'
-                    }`}
-                  >
-                    {monthlyWins
-                      ? `+ Costs more over ${monthCount} months`
-                      : lowWins
-                        ? `Saves ${formatBdt(habitResult?.difference ?? 0)} total`
-                        : `Same total over ${monthCount} months`}
+                  <p className="text-xs text-slate-500">
+                    Fixed charges {formatBdt(habitResult.lowBalanceFixedCharges)} · energy + VAT{' '}
+                    {formatBdt(habitResult.energyAndVat)}
                   </p>
                 </div>
 
@@ -492,29 +540,29 @@ export default function App() {
                 >
                   {monthlyWins ? (
                     <div className="absolute top-0 right-0 rounded-bl-lg bg-emerald-500 px-3 py-1 text-xs font-bold text-white">
-                      WINNER
+                      COSTS LESS
+                    </div>
+                  ) : null}
+                  {isTie ? (
+                    <div className="absolute top-0 right-0 rounded-bl-lg bg-slate-500 px-3 py-1 text-xs font-bold text-white">
+                      TIE
                     </div>
                   ) : null}
                   <h3 className={`mb-1 font-bold ${monthlyWins ? 'text-emerald-900' : 'text-slate-800'}`}>
-                    &quot;1st of Month&quot; Habit
+                    Start of each month
                   </h3>
                   <p className={`mb-4 text-xs ${monthlyWins ? 'text-emerald-700/70' : 'text-slate-500'}`}>
                     Recharge {comparison?.monthly_amount_bdt ?? '—'} BDT on the 1st of each month.
                   </p>
+                  <p className="mb-1 text-xs uppercase tracking-wide text-slate-500">Billed cost</p>
                   <div className={`mb-1 text-3xl font-bold ${monthlyWins ? 'text-emerald-700' : 'text-slate-800'}`}>
-                    {formatBdt(habitResult?.monthlyCost ?? 0)}
+                    {formatBdt(habitResult.monthlyCost)}
                   </div>
-                  <p
-                    className={`text-sm font-medium ${
-                      monthlyWins ? 'text-emerald-600' : lowWins ? 'text-red-500' : 'text-slate-500'
-                    }`}
-                  >
-                    {monthlyWins
-                      ? `Saves ${formatBdt(habitResult?.difference ?? 0)} total`
-                      : lowWins
-                        ? `+ Costs more over ${monthCount} months`
-                        : `Same total over ${monthCount} months`}
+                  <p className="text-xs text-slate-500">
+                    Fixed charges {formatBdt(habitResult.monthlyFixedCharges)} · energy + VAT{' '}
+                    {formatBdt(habitResult.energyAndVat)}
                   </p>
+                </div>
                 </div>
               </div>
             )}
