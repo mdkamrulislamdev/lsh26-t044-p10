@@ -8,21 +8,51 @@ This file is the full technical story of the Prepaid Meter Recharge Advisor: wha
 
 ## 1. What we built, in one picture
 
-```
-Load household JSON
-        │
-        ▼
-  extractCase()          parse opening_balance, days, recharges,
-        │                today, usual_daily_units, target_date, comparison
-        ▼
-  React state: parsedData
-        │
-        ├─► runSimulation()     item 2: day-by-day balance + recharge marks
-        ├─► runPredictions()    item 3: run-out date + amount needed today
-        └─► compareHabits()     item 4: low-balance vs 1st-of-month cost
+Tabs only **read** engine results. A click never invents a taka amount. Switching tabs does not re-run the engine (`useMemo` keys off `parsedData`, not the active tab).
+
+### Overall system
+
+```mermaid
+flowchart TD
+  A[Paste JSON or Load 6-month household] --> B[extractCase]
+  B --> C[parsedData in React state]
+  C --> D[runSimulation]
+  C --> E[runPredictions]
+  C --> F[compareHabits]
+  D --> G[Balance tab: line + recharge marks]
+  E --> H[Questions tab: run-out date and amount today]
+  F --> I[Habits tab: which costs less and by how much]
 ```
 
-A click never invents a taka amount. Tabs only **read** what the engine already computed. Switching tabs does not re-run the engine (`useMemo` keys off `parsedData`, not the active tab).
+### One billing day
+
+```mermaid
+flowchart TD
+  S[Start of calendar day] --> M{New month?}
+  M -->|yes| R[Slab counter 0, 82-flag off]
+  M -->|no| Q
+  R --> Q{Recharge today?}
+  Q -->|yes| T[Add deposit]
+  T --> F{First recharge this month?}
+  F -->|yes| X[Subtract 82]
+  F -->|no| E
+  X --> E
+  Q -->|no| E[Price today's units at running slab]
+  E --> V[VAT 5% of energy]
+  V --> B[Subtract bill from balance]
+  B --> C[Add units to month counter]
+```
+
+### Two habits
+
+```mermaid
+flowchart LR
+  D[Same days in comparison.months] --> L[Low balance: top up if balance below threshold]
+  D --> M[Monthly: top up on the 1st]
+  L --> C[Cost = energy + VAT + 82s]
+  M --> C
+  C --> W[Cheaper habit, or tie]
+```
 
 ---
 
@@ -386,6 +416,21 @@ Predictions rebuild when the user changes the date picker (`targetDate`).
 | Tests on all 25 public cases | Catch VAT, slab reset, 82-once, habit multiples of 82, energy rebuild. |
 
 What we would do with more time (not required): Web Worker for huge pastes; virtualise the chart; case picker for all 25 files in the UI.
+
+---
+
+## 10.1 Security
+
+There is no backend, no auth, and no secrets in the repo.
+
+| Risk | Handling |
+|---|---|
+| Pasted JSON | `JSON.parse` only (never `eval`). Errors are caught; the page does not crash. |
+| Oversized paste | Rejected above 5,000,000 characters. |
+| Empty `cases` array | Rejected with a clear error. |
+| XSS | Values render as React text, not HTML. |
+| Prototype pollution | Only named fields are read (`opening_balance_bdt`, `days`, …). |
+| Date injection | Display uses split `YYYY-MM-DD` / locale formatters, not raw HTML. |
 
 ---
 

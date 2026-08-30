@@ -12,19 +12,18 @@ import {
   calculateEnergyCost,
   calendarMonthKey,
   compareHabits,
-  DEMAND_CHARGE,
-  METER_RENT,
+  FIXED_CHARGES,
   roundTaka,
   runPredictions,
   runSimulation,
-  VAT_MULTIPLIER,
+  VAT_RATE,
 } from './src/billingEngine.ts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const inputPath = path.join(__dirname, 'docs', 'P10_prepaid_meter_public.json')
 const outputPath = path.join(__dirname, 'docs', 'test_report.json')
 
-const FIXED = METER_RENT + DEMAND_CHARGE
+const FIXED = FIXED_CHARGES
 const EPS = 1e-6
 
 function almost(a, b, eps = EPS) {
@@ -48,7 +47,7 @@ function expectedHabitEnergyVat(days, months, dailyUnits) {
         monthRunningUnits = 0
       }
       const energy = calculateEnergyCost(units, monthRunningUnits)
-      const vat = roundTaka(energy * VAT_MULTIPLIER)
+      const vat = roundTaka(energy * VAT_RATE)
       total = roundTaka(total + roundTaka(energy + vat))
       monthRunningUnits += units
     })
@@ -150,7 +149,7 @@ function collectCaseIssues(testCase, simulationResult, predictions, comparison) 
   }
 
   history.forEach((point) => {
-    if (!almost(point.vat, point.rawEnergyCost * VAT_MULTIPLIER, 0.015)) {
+    if (!almost(point.vat, point.rawEnergyCost * VAT_RATE, 0.015)) {
       issues.push(`VAT mismatch on ${point.date}: ${point.vat} vs 5% of ${point.rawEnergyCost}`)
     }
     if (point.fixedChargesTaken !== 0 && !almost(point.fixedChargesTaken, FIXED)) {
@@ -193,7 +192,7 @@ function collectCaseIssues(testCase, simulationResult, predictions, comparison) 
   })
 
   if (predictions) {
-    if (!almost(predictions.breakdown.vat, predictions.breakdown.energy * VAT_MULTIPLIER, 0.02)) {
+    if (!almost(predictions.breakdown.vat, predictions.breakdown.energy * VAT_RATE, 0.02)) {
       issues.push(
         `Prediction VAT is not 5% of energy: vat=${predictions.breakdown.vat} energy=${predictions.breakdown.energy}`,
       )

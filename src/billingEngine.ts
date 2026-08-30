@@ -1,42 +1,27 @@
-/**
- * PHASE 6: Constants & State Setup
- * These are strictly defined by the problem statement.
- * Do not alter these rates.
- */
+/** Official P10 tariff. Do not change these rates. */
 
 export const METER_RENT = 40.0
 export const DEMAND_CHARGE = 42.0
-export const VAT_MULTIPLIER = 0.05 // 5%
+export const FIXED_CHARGES = METER_RENT + DEMAND_CHARGE
+export const VAT_RATE = 0.05
 
-// Structuring the slabs for easy calculation.
-// 'limit' is the highest unit in that tier. 'Infinity' captures the top tier.
+/** Upper inclusive unit bound for each energy rate (BDT per unit). */
 export const TARIFF_SLABS = [
-  { limit: 75, rate: 4.63 }, // Units 1 to 75
-  { limit: 200, rate: 5.26 }, // Units 76 to 200
-  { limit: 300, rate: 5.63 }, // Units 201 to 300
-  { limit: 400, rate: 5.83 }, // Units 301 to 400
-  { limit: 600, rate: 9.3 }, // Units 401 to 600 (problem rate: 9.30)
-  { limit: Infinity, rate: 10.7 }, // Units 601 and above (problem rate: 10.70)
+  { limit: 75, rate: 4.63 },
+  { limit: 200, rate: 5.26 },
+  { limit: 300, rate: 5.63 },
+  { limit: 400, rate: 5.83 },
+  { limit: 600, rate: 9.3 },
+  { limit: Infinity, rate: 10.7 },
 ] as const
+
+export const FIRST_SLAB_RATE = TARIFF_SLABS[0].rate
 
 export type MeterEngineState = {
   balance: number
   currentMonth: string | null
   monthRunningUnits: number
   hasPaidFixedChargesThisMonth: boolean
-}
-
-/**
- * Helper stub for Phase 7 (The Loop)
- * This object will track the state as we iterate day by day.
- */
-export function createInitialMeterState(openingBalance: string | number): MeterEngineState {
-  return {
-    balance: parseFloat(String(openingBalance)),
-    currentMonth: null,
-    monthRunningUnits: 0,
-    hasPaidFixedChargesThisMonth: false,
-  }
 }
 
 export type SimulationDay = {
@@ -68,113 +53,6 @@ export type SimulationResult = {
   finalBalance: number
   history: SimulationPoint[]
   finalState: PredictionState
-}
-
-/** Round taka to two decimal places (paisa). */
-export function roundTaka(value: number): number {
-  return parseFloat(value.toFixed(2))
-}
-export function calendarMonthKey(isoDate: string): string {
-  const [year, month] = isoDate.split('-')
-  return `${year}-${Number(month) - 1}`
-}
-
-/**
- * PHASE 7: The Slab Calculator
- * Accurately splits a day's units across tariff slabs based on the month's running total.
- */
-export function calculateEnergyCost(dailyUnits: number, monthRunningUnits: number): number {
-  let remainingUnits = dailyUnits
-  let currentCounter = monthRunningUnits
-  let totalCost = 0
-
-  for (const slab of TARIFF_SLABS) {
-    if (remainingUnits <= 0) break
-
-    if (currentCounter < slab.limit) {
-      const roomInSlab = slab.limit - currentCounter
-      const unitsToChargeAtThisRate = Math.min(remainingUnits, roomInSlab)
-
-      totalCost += unitsToChargeAtThisRate * slab.rate
-      remainingUnits -= unitsToChargeAtThisRate
-      currentCounter += unitsToChargeAtThisRate
-    }
-  }
-
-  return roundTaka(totalCost)
-}
-
-/**
- * PHASE 8: The Chronological Simulation Loop
- * Rebuilds the balance timeline day by day.
- */
-export function runSimulation(
-  days: SimulationDay[],
-  recharges: SimulationRecharge[],
-  openingBalance: string | number,
-): SimulationResult {
-  let balance = parseFloat(String(openingBalance))
-  let currentMonth: string | null = null
-  let monthRunningUnits = 0
-  let hasPaidFixedChargesThisMonth = false
-
-  const history: SimulationPoint[] = []
-
-  days.forEach((dayObj) => {
-    const monthKey = calendarMonthKey(dayObj.date)
-
-    if (currentMonth !== monthKey) {
-      currentMonth = monthKey
-      monthRunningUnits = 0
-      hasPaidFixedChargesThisMonth = false
-    }
-
-    const todaysRecharges = recharges.filter((recharge) => recharge.date === dayObj.date)
-    let rechargeTotalToday = 0
-    let fixedChargesTakenToday = 0
-
-    todaysRecharges.forEach((recharge) => {
-      const amount = parseFloat(String(recharge.amount_bdt))
-      balance += amount
-      rechargeTotalToday += amount
-
-      if (!hasPaidFixedChargesThisMonth) {
-        fixedChargesTakenToday = METER_RENT + DEMAND_CHARGE
-        balance -= fixedChargesTakenToday
-        hasPaidFixedChargesThisMonth = true
-      }
-    })
-
-    const rawEnergyCost = calculateEnergyCost(dayObj.units, monthRunningUnits)
-    const vat = roundTaka(rawEnergyCost * VAT_MULTIPLIER)
-    const totalDailyConsumptionCost = roundTaka(rawEnergyCost + vat)
-
-    balance -= totalDailyConsumptionCost
-    monthRunningUnits += dayObj.units
-
-    history.push({
-      date: dayObj.date,
-      balance: parseFloat(balance.toFixed(2)),
-      rechargeAmount: rechargeTotalToday > 0 ? rechargeTotalToday : null,
-      units: dayObj.units,
-      rawEnergyCost,
-      vat,
-      fixedChargesTaken: fixedChargesTakenToday,
-      monthRunningUnits,
-    })
-  })
-
-  return {
-    finalBalance: balance,
-    history,
-    finalState: {
-      balance: parseFloat(balance.toFixed(2)),
-      currentMonth,
-      monthRunningUnits,
-      hasPaidFixedChargesThisMonth,
-      date: history[history.length - 1]?.date ?? '',
-    },
-  }
 }
 
 export type PredictionBreakdown = {
@@ -216,6 +94,16 @@ export type HabitComparisonResult = {
   monthlyFixedCharges: number
 }
 
+export function roundTaka(value: number): number {
+  return parseFloat(value.toFixed(2))
+}
+
+/** Detects calendar-month change without parsing ISO dates as UTC. */
+export function calendarMonthKey(isoDate: string): string {
+  const [year, month] = isoDate.split('-')
+  return `${year}-${Number(month) - 1}`
+}
+
 function addCalendarDays(isoDate: string, days: number): string {
   const [year, month, day] = isoDate.split('-').map(Number)
   const next = new Date(year, month - 1, day + days)
@@ -229,35 +117,126 @@ function isFirstDayOfMonth(isoDate: string): boolean {
   return isoDate.slice(8, 10) === '01'
 }
 
+function groupRechargesByDate(recharges: SimulationRecharge[]): Map<string, SimulationRecharge[]> {
+  const byDate = new Map<string, SimulationRecharge[]>()
+  for (const recharge of recharges) {
+    const list = byDate.get(recharge.date)
+    if (list) list.push(recharge)
+    else byDate.set(recharge.date, [recharge])
+  }
+  return byDate
+}
+
+/** Prices today's units at the slab the month's running total has already reached. */
+export function calculateEnergyCost(dailyUnits: number, monthRunningUnits: number): number {
+  let remainingUnits = dailyUnits
+  let currentCounter = monthRunningUnits
+  let totalCost = 0
+
+  for (const slab of TARIFF_SLABS) {
+    if (remainingUnits <= 0) break
+    if (currentCounter >= slab.limit) continue
+
+    const roomInSlab = slab.limit - currentCounter
+    const unitsAtThisRate = Math.min(remainingUnits, roomInSlab)
+    totalCost += unitsAtThisRate * slab.rate
+    remainingUnits -= unitsAtThisRate
+    currentCounter += unitsAtThisRate
+  }
+
+  return roundTaka(totalCost)
+}
+
+/** Rebuilds meter balance day by day. ৳82 is taken on the first recharge of each calendar month. */
+export function runSimulation(
+  days: SimulationDay[],
+  recharges: SimulationRecharge[],
+  openingBalance: string | number,
+): SimulationResult {
+  let balance = parseFloat(String(openingBalance))
+  let currentMonth: string | null = null
+  let monthRunningUnits = 0
+  let hasPaidFixedChargesThisMonth = false
+  const rechargesByDate = groupRechargesByDate(recharges)
+  const history: SimulationPoint[] = []
+
+  for (const dayObj of days) {
+    const monthKey = calendarMonthKey(dayObj.date)
+
+    if (currentMonth !== monthKey) {
+      currentMonth = monthKey
+      monthRunningUnits = 0
+      hasPaidFixedChargesThisMonth = false
+    }
+
+    const todaysRecharges = rechargesByDate.get(dayObj.date) ?? []
+    let rechargeTotalToday = 0
+    let fixedChargesTakenToday = 0
+
+    for (const recharge of todaysRecharges) {
+      const amount = parseFloat(String(recharge.amount_bdt))
+      if (!Number.isFinite(amount)) continue
+      balance += amount
+      rechargeTotalToday += amount
+
+      if (!hasPaidFixedChargesThisMonth) {
+        fixedChargesTakenToday = FIXED_CHARGES
+        balance -= fixedChargesTakenToday
+        hasPaidFixedChargesThisMonth = true
+      }
+    }
+
+    const rawEnergyCost = calculateEnergyCost(dayObj.units, monthRunningUnits)
+    const vat = roundTaka(rawEnergyCost * VAT_RATE)
+    const totalDailyConsumptionCost = roundTaka(rawEnergyCost + vat)
+
+    balance -= totalDailyConsumptionCost
+    monthRunningUnits += dayObj.units
+
+    history.push({
+      date: dayObj.date,
+      balance: roundTaka(balance),
+      rechargeAmount: rechargeTotalToday > 0 ? rechargeTotalToday : null,
+      units: dayObj.units,
+      rawEnergyCost,
+      vat,
+      fixedChargesTaken: fixedChargesTakenToday,
+      monthRunningUnits,
+    })
+  }
+
+  return {
+    finalBalance: balance,
+    history,
+    finalState: {
+      balance: roundTaka(balance),
+      currentMonth,
+      monthRunningUnits,
+      hasPaidFixedChargesThisMonth,
+      date: history[history.length - 1]?.date ?? '',
+    },
+  }
+}
+
 /**
- * PHASE 9: Prediction Algorithm
- * Run-out date from today's balance at usual daily use.
- * Amount to recharge today to last until targetDate: energy + higher-slab extra +
- * at most one month of fixed charges (today's month only) + 5% VAT on energy.
+ * Run-out date at usual daily use.
+ * Amount to recharge today: energy through the picked date + 5% VAT + ৳82 only if
+ * this calendar month has not already taken rent+demand. No extra ৳82 for later months.
  */
 export function runPredictions(
   currentState: PredictionState,
   usualDailyUnits: number,
   targetDate: string,
 ): PredictionResult {
-  let {
-    balance,
-    currentMonth,
-    monthRunningUnits,
-    hasPaidFixedChargesThisMonth,
-    date,
-  } = currentState
+  let { balance, currentMonth, monthRunningUnits, hasPaidFixedChargesThisMonth, date } =
+    currentState
 
   let currentDate = date
   let runOutDate: string | null = null
-
   const breakdown: PredictionBreakdown = { energy: 0, vat: 0, fixedCharges: 0, slabPenalty: 0 }
-  const baseSlabCost = 4.63
 
-  // One recharge today is a first-of-month charge only if this calendar month has not
-  // already taken rent+demand. Later months in this path have no extra recharges.
   if (!hasPaidFixedChargesThisMonth) {
-    breakdown.fixedCharges = METER_RENT + DEMAND_CHARGE
+    breakdown.fixedCharges = FIXED_CHARGES
   }
 
   const maxSimulationDays = 365
@@ -275,13 +254,13 @@ export function runPredictions(
     }
 
     const energyCost = calculateEnergyCost(usualDailyUnits, monthRunningUnits)
-    const vat = roundTaka(energyCost * VAT_MULTIPLIER)
+    const vat = roundTaka(energyCost * VAT_RATE)
     const dailyTotal = roundTaka(energyCost + vat)
 
     if (dateStr <= targetDate) {
       breakdown.energy += energyCost
       breakdown.vat += vat
-      breakdown.slabPenalty += energyCost - usualDailyUnits * baseSlabCost
+      breakdown.slabPenalty += energyCost - usualDailyUnits * FIRST_SLAB_RATE
     }
 
     balance -= dailyTotal
@@ -297,7 +276,7 @@ export function runPredictions(
   }
 
   const energy = roundTaka(breakdown.energy)
-  const vat = roundTaka(energy * VAT_MULTIPLIER)
+  const vat = roundTaka(energy * VAT_RATE)
   const fixedCharges = roundTaka(breakdown.fixedCharges)
 
   return {
@@ -313,11 +292,9 @@ export function runPredictions(
 }
 
 /**
- * PHASE 10: Habit Comparison
- * Same three months, same daily units and slab counter. Cost is energy + 5% VAT +
- * ৳82 on the first recharge of a calendar month — not the money deposited.
- * Low balance: top up at the start of the day when balance is below the threshold.
- * Monthly: top up on the 1st of each month.
+ * Same months and units for both habits. Cost is energy + VAT + ৳82, not deposits.
+ * Low balance: top up at start of day when balance is below the threshold.
+ * Monthly: top up on the 1st.
  */
 export function compareHabits(
   days: SimulationDay[],
@@ -335,19 +312,25 @@ export function compareHabits(
   const constantUnits =
     typeof daily_units === 'number' && Number.isFinite(daily_units) ? daily_units : null
 
+  const monthSet = new Set(months)
   const simulationDays = days
-    .filter((day) => months.includes(day.date.substring(0, 7)))
+    .filter((day) => monthSet.has(day.date.substring(0, 7)))
     .map((day) => (constantUnits === null ? day : { ...day, units: constantUnits }))
 
+  const lowThreshold = parseFloat(String(low_threshold_bdt))
+  const lowAmount = parseFloat(String(low_amount_bdt))
+  const monthlyAmount = parseFloat(String(monthly_amount_bdt))
+  const opening = parseFloat(String(opening_balance_bdt))
+
   const simulate = (isMonthlyHabit: boolean): HabitTotals => {
-    let balance = parseFloat(String(opening_balance_bdt))
+    let balance = opening
     let currentMonth: string | null = null
     let monthRunningUnits = 0
     let hasPaidFixedChargesThisMonth = false
     let energyAndVat = 0
     let fixedChargesTotal = 0
 
-    simulationDays.forEach((day) => {
+    for (const day of simulationDays) {
       const monthKey = calendarMonthKey(day.date)
 
       if (currentMonth !== monthKey) {
@@ -358,28 +341,27 @@ export function compareHabits(
 
       let triggeredRecharge = false
       if (isMonthlyHabit && isFirstDayOfMonth(day.date)) {
-        balance += parseFloat(String(monthly_amount_bdt))
+        balance += monthlyAmount
         triggeredRecharge = true
-      } else if (!isMonthlyHabit && balance < parseFloat(String(low_threshold_bdt))) {
-        balance += parseFloat(String(low_amount_bdt))
+      } else if (!isMonthlyHabit && balance < lowThreshold) {
+        balance += lowAmount
         triggeredRecharge = true
       }
 
       if (triggeredRecharge && !hasPaidFixedChargesThisMonth) {
-        const fixedCharges = METER_RENT + DEMAND_CHARGE
-        balance -= fixedCharges
-        fixedChargesTotal = roundTaka(fixedChargesTotal + fixedCharges)
+        balance -= FIXED_CHARGES
+        fixedChargesTotal = roundTaka(fixedChargesTotal + FIXED_CHARGES)
         hasPaidFixedChargesThisMonth = true
       }
 
       const energyCost = calculateEnergyCost(day.units, monthRunningUnits)
-      const vat = roundTaka(energyCost * VAT_MULTIPLIER)
+      const vat = roundTaka(energyCost * VAT_RATE)
       const dailyConsumptionCost = roundTaka(energyCost + vat)
 
       balance -= dailyConsumptionCost
       energyAndVat = roundTaka(energyAndVat + dailyConsumptionCost)
       monthRunningUnits += day.units
-    })
+    }
 
     return {
       cost: roundTaka(energyAndVat + fixedChargesTotal),
@@ -390,19 +372,13 @@ export function compareHabits(
 
   const low = simulate(false)
   const monthly = simulate(true)
-  const lowBalanceCost = low.cost
-  const monthlyCost = monthly.cost
 
   return {
-    lowBalanceCost,
-    monthlyCost,
+    lowBalanceCost: low.cost,
+    monthlyCost: monthly.cost,
     winner:
-      lowBalanceCost < monthlyCost
-        ? 'Low Balance'
-        : monthlyCost < lowBalanceCost
-          ? 'Monthly'
-          : 'Tie',
-    difference: roundTaka(Math.abs(lowBalanceCost - monthlyCost)),
+      low.cost < monthly.cost ? 'Low Balance' : monthly.cost < low.cost ? 'Monthly' : 'Tie',
+    difference: roundTaka(Math.abs(low.cost - monthly.cost)),
     energyAndVat: low.energyAndVat,
     lowBalanceFixedCharges: low.fixedCharges,
     monthlyFixedCharges: monthly.fixedCharges,

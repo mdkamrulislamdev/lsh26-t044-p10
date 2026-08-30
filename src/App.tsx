@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   CartesianGrid,
   Line,
@@ -19,6 +19,7 @@ import {
 import household from './data/household.json'
 
 const HOUSEHOLD_JSON = JSON.stringify(household, null, 2)
+const MAX_JSON_CHARS = 5_000_000
 
 const SECTIONS = [
   { id: 'household', step: '1', label: 'Household', hint: 'Load readings' },
@@ -97,6 +98,10 @@ function parseComparison(value: unknown): ComparisonParams | undefined {
 function extractCase(raw: unknown): ParsedData {
   if (!isRecord(raw)) {
     throw new Error('Invalid format: Root value must be a JSON object.')
+  }
+
+  if (Array.isArray(raw.cases) && raw.cases.length === 0) {
+    throw new Error('Invalid format: cases array is empty.')
   }
 
   const source = Array.isArray(raw.cases) ? raw.cases[0] : raw
@@ -196,6 +201,21 @@ function summarizeHousehold(data: ParsedData): HouseholdFacts | null {
   }
 }
 
+function NeedHousehold({ onGo }: { onGo: () => void }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-line bg-canvas/60 px-6 py-10 text-center">
+      <p className="text-sm text-muted">Start on Household and load readings first.</p>
+      <button
+        type="button"
+        onClick={onGo}
+        className="mt-4 rounded-full bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark"
+      >
+        Go to Household
+      </button>
+    </div>
+  )
+}
+
 function CustomTooltip({ active, payload, label }: TooltipViewProps) {
   if (!active || !payload?.length) return null
   const data = payload[0].payload
@@ -215,12 +235,20 @@ export default function App() {
   const [error, setError] = useState('')
   const [targetDate, setTargetDate] = useState('')
 
+  const applyCase = (data: ParsedData) => {
+    setError('')
+    setParsedData(data)
+    setTargetDate(data.target_date ?? '')
+  }
+
   const handleLoadData = () => {
     setError('')
     try {
       if (!jsonInput.trim()) throw new Error('Paste JSON first, or load the six-month household.')
-      const data: unknown = JSON.parse(jsonInput)
-      setParsedData(extractCase(data))
+      if (jsonInput.length > MAX_JSON_CHARS) {
+        throw new Error('JSON is too large to parse in the browser.')
+      }
+      applyCase(extractCase(JSON.parse(jsonInput) as unknown))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not parse JSON.')
       setParsedData(null)
@@ -229,18 +257,13 @@ export default function App() {
 
   const handleLoadHousehold = () => {
     setJsonInput(HOUSEHOLD_JSON)
-    setError('')
     try {
-      setParsedData(extractCase(household))
+      applyCase(extractCase(household))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load household.')
       setParsedData(null)
     }
   }
-
-  useEffect(() => {
-    setTargetDate(parsedData?.target_date ?? '')
-  }, [parsedData])
 
   const simulation = useMemo(() => {
     if (!parsedData) return null
@@ -288,19 +311,6 @@ export default function App() {
   const todayBalance =
     simulation?.history.find((row) => row.date === parsedData?.today)?.balance ??
     simulation?.finalState.balance
-
-  const needHousehold = (
-    <div className="rounded-2xl border border-dashed border-line bg-canvas/60 px-6 py-10 text-center">
-      <p className="text-sm text-muted">Start on Household and load readings first.</p>
-      <button
-        type="button"
-        onClick={() => setSection('household')}
-        className="mt-4 rounded-full bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark"
-      >
-        Go to Household
-      </button>
-    </div>
-  )
 
   return (
     <div className="flex min-h-screen flex-col text-ink">
@@ -504,7 +514,7 @@ export default function App() {
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
-                needHousehold
+                <NeedHousehold onGo={() => setSection('household')} />
               )}
             </div>
             {parsedData ? (
@@ -528,7 +538,9 @@ export default function App() {
               and VAT.
             </p>
             {!parsedData ? (
-              <div className="mt-6">{needHousehold}</div>
+              <div className="mt-6">
+                <NeedHousehold onGo={() => setSection('household')} />
+              </div>
             ) : (
               <>
                 <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -600,7 +612,9 @@ export default function App() {
               deposited. A tie is allowed. Any gap is only how often ৳82 was taken.
             </p>
             {!parsedData ? (
-              <div className="mt-6">{needHousehold}</div>
+              <div className="mt-6">
+                <NeedHousehold onGo={() => setSection('household')} />
+              </div>
             ) : !habitResult ? (
               <p className="mt-6 text-sm text-muted">This household has no comparison months.</p>
             ) : (
