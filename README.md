@@ -1,25 +1,24 @@
-# MeterWise — Prepaid Meter Recharge Advisor (P10)
+# MeterWise — Prepaid Meter Recharge Advisor
 
-LofiStack Hackathon 2026 · Problem **P10**
+LofiStack Hackathon 2026
+
+| | |
+|---|---|
+| **Team ID** | `lsh26-t044` |
+| **Problem ID** | `p10` |
+| **Live URL** | https://p1-nine-kappa.vercel.app/ |
+| **Public repository** | https://github.com/mdkamrulislamdev/lsh26-t044-p10 |
+| **Commit SHA** | After you push, run `git rev-parse HEAD` and paste the **full 40-character** hash on the form. Do not paste `main` or a short SHA. |
 
 Four tabs, in order: **Household → Balance → Questions → Habits**.
 
-## Submission (copy these exactly)
+Third-party licenses: [`LICENSES.md`](./LICENSES.md). How the engine works: [`architecture.md`](./architecture.md). Event fields: [`EVENT.md`](./EVENT.md).
 
-| Field | Value |
-|---|---|
-| Problem ID | `p10` |
-| Public repository | https://github.com/mdkamrulislamdev/p1 |
-| Commit SHA (40 characters) | `6e0b12609167dad9b15c8919a69765570e1a63f4` |
-| Live application URL | _add the public https URL after deploy — not `main`, not a short SHA, not localhost_ |
-
-A branch name or a short SHA is not accepted. The SHA above is the full hash of the product freeze on `main`.
-
-**Demo video:** _add a ≤ 60 second link: Load 6-month household → Balance → Questions → Habits._
+**Demo video:** _add the ≤ 60 second link here after upload._
 
 ---
 
-## How to run
+## Setup and run
 
 Node.js 20+ and npm.
 
@@ -28,7 +27,7 @@ npm install
 npm run dev
 ```
 
-Open the URL Vite prints (usually `http://localhost:5173`).
+Open the URL Vite prints (usually `http://localhost:5173`). Judges should use the **Live URL** above — no install.
 
 ```bash
 npm run build
@@ -36,75 +35,71 @@ npm run preview
 npm run test:engine
 ```
 
-Engine tests need `docs/P10_prepaid_meter_public.json` on disk (gitignored; copy from the problem pack). The app itself does not need that file — it ships `src/data/household.json`.
+Engine tests need `docs/P10_prepaid_meter_public.json` on disk (gitignored; copy from the problem pack). The app ships `src/data/household.json` and does not need that file to run.
 
 ---
 
-## How to check the four required items
+## How we approached the problem
 
-### 1. Household
-
-1. Open the app. You start on **Household**.
-2. Click **Load 6-month household**.
-3. Confirm at least **6 months**, a **light** month, a **heavy** month, and a **last-week** recharge (built-in family: January light, May heavy, ৳5,000 on 28 June).
-4. Optional: paste a public case JSON and click **Load pasted JSON**.
-
-Empty paste and broken JSON show an error and do not crash.
-
-### 2. Balance
-
-1. Click **Next: Balance** (or the Balance tab).
-2. You should see a **line** of daily balance.
-3. **Green marks** are recharges. Hover a mark: date and amount should match the household `recharges`.
-4. A recharge does **not** reset the slab. The slab counter resets on the **1st**. ৳82 (meter rent 40 + demand 42) is taken on the **first recharge of each calendar month**. VAT is **5% of energy only**.
-
-### 3. Questions
-
-1. Open **Questions**.
-2. **When does the balance run out?** uses today’s rebuilt balance and `usual_daily_units`.
-3. Pick a date. **How much to recharge today** is energy + higher slab + fixed charges + VAT.
-4. Change the date: the total should change.
-
-### 4. Habits
-
-1. Open **Habits**.
-2. Same three months, same daily units.
-3. **Cost is not the deposit.** It is energy + VAT + ৳82 when that month took a first recharge.
-4. The banner says which habit costs less **and by how much**, or that they **tie**.
+We put every taka amount in one browser engine (`src/billingEngine.ts`) and let the UI only display it. The four required items are four tabs in the same order as the problem. Dates stay `YYYY-MM-DD` strings so the 1st of the month does not shift. Cost for habits is energy + VAT + ৳82, never the money deposited (R-33). Both habits use the same daily units (R-16).
 
 ---
 
-## Edge cases judges mark
+## Proof each required item is met
 
-| Check | What should happen |
+### 1. Household (six months of readings)
+
+**Load 6-month household** loads `HH-DHAKA-01`: January–June 2026 daily units, light January, heavy May, ৳5,000 on 28 June (last week of the month). The screen then shows month count, light month, heavy month, and last-week recharge. You can also paste a judge case.
+
+### 2. Balance (day-by-day rebuild)
+
+**Balance** draws a line of rebuilt meter balance. Each day: units at the month’s running slab, ৳82 (rent 40 + demand 42) on the **first recharge of that calendar month**, 5% VAT on **energy only**. Green marks are recharges; hover for date and amount. A recharge does not reset the slab.
+
+### 3. Questions (run out + recharge today)
+
+**Questions** uses today’s rebuilt balance and usual daily use for the run-out date. Pick a date for how much to recharge **today**, split into energy, higher slab, fixed charges, and VAT. ৳82 appears only if this calendar month has not already taken rent+demand. Later months on that one top-up do not add extra ৳82.
+
+### 4. Habits (low balance vs start of month)
+
+**Habits** runs the same three months and the same daily units. Low balance: top up at the **start of the day** if balance is **below** the threshold. Monthly: top up on the **1st**. Cost is billed energy + VAT + ৳82s, not deposits. The banner shows which costs less and by how much, or a **tie**.
+
+Clarifications: **R-16** (no energy-rate saving from timing; difference is only ৳82 counts; ties allowed) and **R-33** (cost ≠ deposit; opening balance and months from `comparison`).
+
+---
+
+## Major decisions
+
+1. Browser-only engine so the live URL needs no server.
+2. Four tabs, one required item each, instead of one crowded dashboard.
+3. Cost is never the deposit amount.
+4. String dates and two-decimal taka so the 1st and paisa stay stable.
+5. Tests against the 25 public cases so R-16 / R-33 hold beyond the built-in household.
+
+---
+
+## Known limitations
+
+- No live DESCO/NESCO meter API.
+- Rates are the problem’s table, not a live circular lookup.
+- A `{ "cases": [...] }` paste uses the **first** case only.
+- Refreshing the page clears the loaded household (no login, no database).
+- “Higher slab” is energy minus (units × 4.63), not a separate billed fee.
+- Demo video link is filled when the recording is uploaded.
+
+Empty or invalid JSON shows an error and does not crash. Other tabs send you back to Household if nothing is loaded.
+
+---
+
+## Registered members — major contributions
+
+| Member | Contribution |
 |---|---|
-| **R-16 same consumption** | Both habits use the same daily units and the same month slab counter. Recharge timing cannot create an energy-rate saving. |
-| **R-16 difference** | Any gap is only how many times ৳82 was taken. Difference is 0, 82, 164, … A fabricated slab saving is a failure. A **tie is allowed**. |
-| **R-33 cost** | Cost = energy + VAT + applicable monthly fixed charges. **Not** the money deposited. |
-| **R-33 low balance** | Recharges the case amount at the **start of any day** whose balance is **below** `low_threshold_bdt`. |
-| **R-33 monthly** | Recharges the case amount on the **1st** of each month. Both habits start from `comparison.opening_balance_bdt` and run `comparison.months`. |
-| **VAT** | VAT line = 5% of **energy**, never 5% of energy + ৳82. |
-| **Fixed charges (questions)** | ৳82 in the breakdown only if this calendar month has **not** already taken rent+demand. One top-up today does **not** add extra ৳82 for later months. |
-| **Slab reset** | On the 1st, units start again at 4.63. A mid-month recharge does not cheapen later units. |
-| **Empty / invalid JSON** | Red error. Page stays up. |
-| **No household yet** | Balance / Questions / Habits tell you to load Household first. |
+| Kamrul (`cdkamrul9`) | Product: four-tab UI, household JSON, billing engine (slabs, simulation, predictions, habits), tests, README / licenses / architecture, live deploy |
 
-Automated checks: `npm run test:engine` (25 public cases + unit checks). Screen walkthrough: `MANUAL_CHECKLIST.md`.
-
-Tariff constants (not a live DESCO feed): 4.63 / 5.26 / 5.63 / 5.83 / 9.30 / 10.70 BDT per unit; VAT 5% on energy; meter rent 40 + demand 42.
-
----
-
-## What is not mocked
-
-Day-by-day rebuild, slab splits, first-recharge ৳82, run-out date, amount needed today, habit totals. All run in the browser from `src/billingEngine.ts`.
-
-## What is out of scope
-
-No live meter API, no login, no database. A `{ "cases": [...] }` paste uses the **first** case. Refreshing the page clears the loaded household.
+Add other registered members here if the arena lists more than one.
 
 ---
 
 ## Tech
 
-React 19, TypeScript, Vite, Tailwind CSS v4, Recharts. Licenses: `LICENSES.md`.
+React 19, TypeScript, Vite, Tailwind CSS v4, Recharts. See [`LICENSES.md`](./LICENSES.md).
