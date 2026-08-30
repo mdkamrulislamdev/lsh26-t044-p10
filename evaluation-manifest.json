@@ -18,23 +18,23 @@
   "requirements": {
     "R1": {
       "status": "complete",
-      "evidence": "Household tab. Button Load 6-month household → src/data/household.json (HH-DHAKA-01, Jan–Jun 2026, light January, heavy May, ৳5000 on 2026-06-28). src/App.tsx summarizeHousehold."
+      "evidence": "Household tab. Button Load 6-month household → src/data/household.json (HH-DHAKA-01). Screenshot: proof_images/1.png. src/App.tsx summarizeHousehold."
     },
     "R2": {
       "status": "complete",
-      "evidence": "Balance tab. Recharts day-by-day line with green recharge marks. Engine: src/billingEngine.ts runSimulation (slabs, ৳82 on first recharge of the calendar month, 5% VAT on energy only)."
+      "evidence": "Balance tab. Recharts day-by-day line with green recharge marks. Screenshot: proof_images/2.png. Engine: src/billingEngine.ts runSimulation."
     },
     "R3": {
       "status": "complete",
-      "evidence": "Questions tab. Run-out date at usual daily use; date picker for amount to recharge today, split into energy, higher slab, fixed charges, VAT. src/billingEngine.ts runPredictions."
+      "evidence": "Questions tab. Run-out date; date picker; energy / higher slab / fixed charges / VAT. Screenshot: proof_images/3.png. src/billingEngine.ts runPredictions."
     },
     "R4": {
       "status": "complete",
-      "evidence": "Habits tab. Same comparison.months and same units. Low balance vs 1st of month. Cost is energy+VAT+৳82, not deposits. Ties allowed. src/billingEngine.ts compareHabits."
+      "evidence": "Habits tab. Same comparison.months and same units. Cost is energy+VAT+৳82, not deposits. Ties allowed. Screenshot: proof_images/4.png. src/billingEngine.ts compareHabits."
     },
     "R5": {
       "status": "complete",
-      "evidence": "Bonus Plan tab (not one of the four scored items). Slab headroom + Friday–Saturday shop-closure advice + Download family plan. src/billingEngine.ts getSlabPosition / adviseClosedShopRecharge; src/familyPlan.ts; src/App.tsx Plan section."
+      "evidence": "Bonus Plan tab. Slab headroom + Friday–Saturday shop-closure advice + Download family plan PDF. src/familyPlan.ts buildFamilyPlanPdf; src/App.tsx Plan section."
     }
   },
   "team_members": [
@@ -49,6 +49,11 @@
         "src/data/household.json",
         "test-runner.js",
         "evaluation-manifest.json",
+        "proof_images/1.png",
+        "proof_images/2.png",
+        "proof_images/3.png",
+        "proof_images/4.png",
+        "LICENSE",
         "26f365d",
         "1e1dba1",
         "25934b7",
@@ -61,7 +66,8 @@
     "Four required tabs in problem order, plus a clearly labelled Plan bonus tab.",
     "Habit cost is billed energy + VAT + ৳82, never the deposit amount (R-33).",
     "String dates and two-decimal taka so the 1st of the month and paisa stay stable.",
-    "npm test runs every public case and prints PASS/FAIL plus a summary in the terminal."
+    "npm test runs every public case and prints PASS/FAIL plus a summary in the terminal.",
+    "Original application source is MIT (LICENSE). Third-party inventory is LICENSES.md."
   ],
   "known_limitations": [
     "No live DESCO/NESCO meter API.",
@@ -70,7 +76,7 @@
     "Refreshing the page clears the loaded household (no login, no database).",
     "Higher-slab line is energy minus (units × 4.63), not a separate billed fee.",
     "Demo video URL is empty until the recording is uploaded.",
-    "Family plan download is a local text file; it is not emailed or stored remotely."
+    "Family plan download is a local one-page PDF; it is not emailed or stored remotely."
   ],
   "ai_tools_used": [
     {

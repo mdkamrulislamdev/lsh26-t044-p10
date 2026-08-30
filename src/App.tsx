@@ -20,7 +20,7 @@ import {
   type SimulationPoint,
 } from './billingEngine'
 import household from './data/household.json'
-import { buildFamilyPlanText, downloadPlainText } from './familyPlan'
+import { downloadFamilyPlanPdf } from './familyPlan'
 
 const HOUSEHOLD_JSON = JSON.stringify(household, null, 2)
 const MAX_JSON_CHARS = 5_000_000
@@ -330,7 +330,7 @@ export default function App() {
 
   const handleDownloadPlan = () => {
     if (!parsedData || !facts) return
-    const text = buildFamilyPlanText({
+    downloadFamilyPlanPdf({
       generatedOn: new Date().toISOString().slice(0, 10),
       monthCount: facts.monthCount,
       lightMonth: monthLabel(facts.lightMonth),
@@ -355,7 +355,6 @@ export default function App() {
       shop: shopAdvice,
       weekendCoverAmount: weekendCover?.amountNeededToday ?? null,
     })
-    downloadPlainText('meterwise-family-plan.txt', text)
   }
 
   return (
@@ -796,10 +795,10 @@ export default function App() {
                     onClick={handleDownloadPlan}
                     className="rounded-full bg-brand px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-dark"
                   >
-                    Download family plan
+                    Download family plan PDF
                   </button>
                   <p className="text-xs text-muted">
-                    Saves a plain-text file on this device. Nothing is uploaded.
+                    Saves a one-page PDF on this device. Nothing is uploaded.
                   </p>
                 </div>
               </>

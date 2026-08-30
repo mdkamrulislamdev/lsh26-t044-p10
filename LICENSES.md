@@ -4,6 +4,8 @@ Team **lsh26-t044** · Problem **p10**
 
 This file lists every framework, library, starter, template, font, icon and asset used in this repository. No AGPL, GPL, LGPL, MPL, SSPL, copyleft, or non-commercial-only assets are included.
 
+Original MeterWise application source is licensed under the **MIT License**. See [`LICENSE`](./LICENSE) (this file sits beside the README).
+
 Application source in `src/` (except third-party packages) is original work for LofiStack Hackathon 2026 unless listed below.
 
 ## Starter / template
@@ -64,6 +66,7 @@ No Lucide, Heroicons, Font Awesome, or image stock. No `hero.png`.
 | `src/data/household.json` | Original (this team) | Built-in six-month Dhaka household |
 | `docs/P10_prepaid_meter_public.json` | Problem pack (gitignored) | Local `npm test` only |
 | `evaluation-manifest.json` | Original (this team) | Judge evaluation pack |
+| `proof_images/1.png` … `4.png` | Original screenshots (this team) | README proof of the four required tabs |
 
 ## Hosting
 

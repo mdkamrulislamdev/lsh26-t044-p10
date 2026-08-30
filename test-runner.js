@@ -22,7 +22,7 @@ import {
   runSimulation,
   VAT_RATE,
 } from './src/billingEngine.ts'
-import { buildFamilyPlanText } from './src/familyPlan.ts'
+import { buildFamilyPlanPdf, buildFamilyPlanText } from './src/familyPlan.ts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const inputPath = path.join(__dirname, 'docs', 'P10_prepaid_meter_public.json')
@@ -175,7 +175,42 @@ function runUnitChecks() {
     {
       name: 'family_plan_text_is_plain',
       pass: (() => {
-        const text = buildFamilyPlanText({
+        const input = {
+          generatedOn: '2026-06-30',
+          monthCount: 6,
+          lightMonth: 'January 2026',
+          lightUnits: 1,
+          heavyMonth: 'May 2026',
+          heavyUnits: 2,
+          lastWeekRecharge: '5000.00 BDT on 2026-06-28',
+          todayBalance: 100,
+          usualDailyUnits: 14,
+          runOutDate: '2026-07-03',
+          targetDate: '2026-07-25',
+          amountNeededToday: 10,
+          breakdown: { energy: 8, vat: 0.4, fixedCharges: 0, slabPenalty: 1 },
+          habitWinner: 'Tie',
+          habitDifference: 0,
+          lowBalanceCost: 1,
+          monthlyCost: 1,
+          slab: getSlabPosition(70),
+          daysUntilNextSlab: 3,
+          shop: adviseClosedShopRecharge('2026-07-03'),
+          weekendCoverAmount: 20,
+        }
+        const text = buildFamilyPlanText(input)
+        return (
+          text.includes('Stay-on plan') &&
+          text.includes('Recharge by 2026-07-02') &&
+          !text.includes('<')
+        )
+      })(),
+      detail: 'Plan facts are complete and not HTML',
+    },
+    {
+      name: 'family_plan_pdf_is_valid',
+      pass: (() => {
+        const bytes = buildFamilyPlanPdf({
           generatedOn: '2026-06-30',
           monthCount: 6,
           lightMonth: 'January 2026',
@@ -198,13 +233,16 @@ function runUnitChecks() {
           shop: adviseClosedShopRecharge('2026-07-03'),
           weekendCoverAmount: 20,
         })
+        const ascii = new TextDecoder('latin1').decode(bytes)
         return (
-          text.includes('Stay-on plan') &&
-          text.includes('Recharge by 2026-07-02') &&
-          !text.includes('<')
+          ascii.startsWith('%PDF-1.4') &&
+          ascii.includes('MeterWise') &&
+          ascii.includes('STAY-ON PLAN') &&
+          ascii.includes('Recharge by 2026-07-02') &&
+          ascii.includes('%%EOF')
         )
       })(),
-      detail: 'Downloaded plan is plain text with slab and Friday advice',
+      detail: 'Family plan download is a one-page PDF with slab and Friday advice',
     },
   ]
   return {

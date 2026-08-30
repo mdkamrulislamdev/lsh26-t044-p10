@@ -12,7 +12,7 @@ LofiStack Hackathon 2026
 
 Four required tabs, in order: **Household → Balance → Questions → Habits**. Bonus: **Plan** (slab headroom and Friday–Saturday shop-closure recharge).
 
-Third-party licenses: [`LICENSES.md`](./LICENSES.md). How the engine works: [`architecture.md`](./architecture.md). Event fields: [`EVENT.md`](./EVENT.md). Judge pack: [`evaluation-manifest.json`](./evaluation-manifest.json).
+Third-party licenses: [`LICENSES.md`](./LICENSES.md). Application license: [`LICENSE`](./LICENSE) (MIT). How the engine works: [`architecture.md`](./architecture.md). Event fields: [`EVENT.md`](./EVENT.md). Judge pack: [`evaluation-manifest.json`](./evaluation-manifest.json).
 
 **Demo video:** _add the ≤ 60 second link here after upload._
 
@@ -51,23 +51,31 @@ We put every taka amount in one browser engine (`src/billingEngine.ts`) and let 
 
 **Load 6-month household** loads `HH-DHAKA-01`: January–June 2026 daily units, light January, heavy May, ৳5,000 on 28 June (last week of the month). The screen then shows month count, light month, heavy month, and last-week recharge. You can also paste a judge case.
 
+![Household tab: six months, light January, heavy May, last-week recharge](proof_images/1.png)
+
 ### 2. Balance (day-by-day rebuild)
 
 **Balance** draws a line of rebuilt meter balance. Each day: units at the month’s running slab, ৳82 (rent 40 + demand 42) on the **first recharge of that calendar month**, 5% VAT on **energy only**. Green marks are recharges; hover for date and amount. A recharge does not reset the slab.
+
+![Balance tab: day-by-day line with green recharge marks](proof_images/2.png)
 
 ### 3. Questions (run out + recharge today)
 
 **Questions** uses today’s rebuilt balance and usual daily use for the run-out date. Pick a date for how much to recharge **today**, split into energy, higher slab, fixed charges, and VAT. ৳82 appears only if this calendar month has not already taken rent+demand. Later months on that one top-up do not add extra ৳82.
 
+![Questions tab: run-out date and recharge-today breakdown](proof_images/3.png)
+
 ### 4. Habits (low balance vs start of month)
 
 **Habits** runs the same three months and the same daily units. Low balance: top up at the **start of the day** if balance is **below** the threshold. Monthly: top up on the **1st**. Cost is billed energy + VAT + ৳82s, not deposits. The banner shows which costs less and by how much, or a **tie**.
+
+![Habits tab: same cost tie on the built-in household](proof_images/4.png)
 
 Clarifications: **R-16** (no energy-rate saving from timing; difference is only ৳82 counts; ties allowed) and **R-33** (cost ≠ deposit; opening balance and months from `comparison`).
 
 ### Bonus. Plan (stay on this month)
 
-**Plan** is extra, not one of the four scored items. It shows how many units remain in this month’s tariff slab (so the family can avoid jumping to a more expensive rate) and, if run-out falls on Friday or Saturday, the Thursday recharge amount that lasts through Sunday when many shops are closed. **Download family plan** saves a plain-text file on the device — nothing is uploaded.
+**Plan** is extra, not one of the four scored items. It shows how many units remain in this month’s tariff slab (so the family can avoid jumping to a more expensive rate) and, if run-out falls on Friday or Saturday, the Thursday recharge amount that lasts through Sunday when many shops are closed. **Download family plan PDF** saves a one-page cream-and-green PDF on the device — nothing is uploaded.
 
 ---
 
@@ -90,7 +98,7 @@ Clarifications: **R-16** (no energy-rate saving from timing; difference is only 
 - Refreshing the page clears the loaded household (no login, no database).
 - “Higher slab” is energy minus (units × 4.63), not a separate billed fee.
 - Demo video link is filled when the recording is uploaded.
-- Family plan download is local text only.
+- Family plan download is a local one-page PDF; it is not emailed or stored remotely.
 
 Empty or invalid JSON shows an error and does not crash. Other tabs send you back to Household if nothing is loaded.
 

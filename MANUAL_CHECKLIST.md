@@ -33,4 +33,4 @@ App tabs: **Household → Balance → Questions → Habits → Plan (bonus)**. E
 
 - [ ] Slab card: units used this month, units left before the next rate, days at usual use.
 - [ ] If run-out is Friday or Saturday: recharge-by Thursday and amount through Sunday.
-- [ ] **Download family plan** saves `meterwise-family-plan.txt` locally (nothing uploaded).
+- [ ] **Download family plan PDF** saves `meterwise-family-plan.pdf` locally (nothing uploaded).

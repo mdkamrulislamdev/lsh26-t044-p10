@@ -396,7 +396,9 @@ Built-in habit params: months Apr–Jun 2026, threshold 200, both amounts 2500, 
 | `src/data/household.json` | Item 1 built-in six-month family |
 | `src/billingEngine.ts` | Slabs, simulation, predictions, habits, slab headroom, Friday shop-closure advice |
 | `src/App.tsx` | Required tabs + Plan bonus, load/paste, chart, date picker, habit banner, plan download |
-| `src/familyPlan.ts` | Plain-text family plan and local file download |
+| `src/familyPlan.ts` | One-page family plan PDF (cream/green, in-browser) |
+| `LICENSE` | MIT license for original MeterWise source (beside the README) |
+| `proof_images/` | Screenshots of the four required tabs |
 | `test-runner.js` | Unit checks + 25 public cases; terminal PASS/FAIL report; `docs/test_report.json` (gitignored) |
 | `evaluation-manifest.json` | Judge pack: team, requirements, members, AI disclosure |
 | `EVENT.md` | Team ID, problem ID, start code, repo, SHA, live URL |
@@ -451,7 +453,7 @@ There is no backend, no auth, and no secrets in the repo.
 | XSS | Values render as React text, not HTML. |
 | Prototype pollution | Only named fields are read (`opening_balance_bdt`, `days`, …). |
 | Date injection | Display uses split `YYYY-MM-DD` / locale formatters, not raw HTML. |
-| Family plan download | `Blob` + `URL.createObjectURL` of engine text. Filename is fixed (`meterwise-family-plan.txt`). Nothing is uploaded. |
+| Family plan download | In-browser PDF (`application/pdf` Blob). Filename is fixed (`meterwise-family-plan.pdf`). Nothing is uploaded. |
 
 ---
 
@@ -472,11 +474,11 @@ There is no backend, no auth, and no secrets in the repo.
 
 | Required item | Proof in product |
 |---|---|
-| 1. Six-month household | Load button; facts: 6 months, Jan light, May heavy, ৳5000 on 28 Jun |
-| 2. Day-by-day line + marks | Recharts step line; green recharge dots; 82 / VAT / slabs in engine |
-| 3. Two questions | Run-out card; date picker; four-line breakdown |
-| 4. Two habits | Banner + two billed costs; same months/units |
-| Bonus. Stay-on plan | Plan tab: slab headroom; Friday–Saturday shop advice; local text download |
+| 1. Six-month household | Load button; facts; screenshot `proof_images/1.png` |
+| 2. Day-by-day line + marks | Recharts step line; green recharge dots; `proof_images/2.png` |
+| 3. Two questions | Run-out card; date picker; four-line breakdown; `proof_images/3.png` |
+| 4. Two habits | Banner + two billed costs; `proof_images/4.png` |
+| Bonus. Stay-on plan | Plan tab; one-page family plan PDF (`src/familyPlan.ts`) |
 | R-16 same units / no slab trick | `compareHabits` one unit series; difference = 82 × count gap |
 | R-16 ties | Winner can be `Tie` |
 | R-33 cost ≠ deposit | Deposits never added to `cost` |
@@ -493,7 +495,7 @@ Automated: `npm test` (unit checks + PUB-01 … PUB-25, PASS/FAIL in the termina
 - Paste of `{ "cases": [...] }` uses the first case only.
 - Refresh clears the loaded household (no login, no database).
 - Higher-slab line is energy minus first-slab rate, not a separate bill item.
-- Family plan is a local text file; it is not emailed or stored remotely.
+- Family plan is a local one-page PDF; it is not emailed or stored remotely.
 - Live URL and demo video must be filled for the arena form (see `EVENT.md` / README).
 
 ---
