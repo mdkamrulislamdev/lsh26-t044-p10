@@ -3,12 +3,13 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
-import { compareHabits, runPredictions, runSimulation } from './billingEngine'
+import { compareHabits, runPredictions, runSimulation, type SimulationPoint } from './billingEngine'
 import household from './data/household.json'
 
 const HOUSEHOLD_JSON = JSON.stringify(household, null, 2)
@@ -41,15 +42,9 @@ type ParsedData = {
   comparison?: ComparisonParams
 }
 
-type ChartPoint = {
-  date: string
-  balance: number
-  rechargeAmount: number | null
-}
-
 type TooltipViewProps = {
   active?: boolean
-  payload?: Array<{ payload: ChartPoint }>
+  payload?: Array<{ payload: SimulationPoint }>
   label?: string
 }
 
@@ -108,10 +103,17 @@ function CustomTooltip({ active, payload, label }: TooltipViewProps) {
     <div className="rounded-lg bg-slate-800 p-3 text-sm text-white shadow-lg">
       <p className="mb-1 font-bold text-slate-300">{label}</p>
       <p>
-        Balance: <span className="font-mono text-amber-400">{data.balance} BDT</span>
+        Balance: <span className="font-mono text-amber-400">{formatBdt(data.balance)}</span>
       </p>
+      <p className="mt-1 text-slate-300">
+        {data.units} units · month total {data.monthRunningUnits}
+      </p>
+      <p className="text-slate-300">Energy {formatBdt(data.rawEnergyCost)} · VAT {formatBdt(data.vat)}</p>
+      {data.fixedChargesTaken > 0 ? (
+        <p className="text-amber-300">First recharge this month: −{formatBdt(data.fixedChargesTaken)} rent+demand</p>
+      ) : null}
       {data.rechargeAmount ? (
-        <p className="mt-1 font-bold text-green-400">+ Recharge: {data.rechargeAmount} BDT</p>
+        <p className="mt-1 font-bold text-green-400">+ Recharge: {formatBdt(data.rechargeAmount)}</p>
       ) : null}
     </div>
   )
@@ -318,9 +320,24 @@ export default function App() {
 
         <section className="col-span-1 flex flex-col gap-6 lg:col-span-2">
           <div className="flex min-h-[400px] flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-sm font-bold uppercase tracking-wider text-slate-500">
-              Balance History
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500">
+              Rebuilt meter balance
             </h2>
+            <p className="mb-3 mt-1 text-xs leading-5 text-slate-500">
+              Each day: units priced at this month’s running slab, 5% VAT on energy, and ৳82
+              (rent 40 + demand 42) on the first recharge of that calendar month. Green marks are
+              recharges. A recharge does not reset the slab counter.
+            </p>
+            <div className="mb-3 flex flex-wrap gap-4 text-xs text-slate-500">
+              <span className="inline-flex items-center gap-2">
+                <span className="h-0.5 w-6 bg-slate-900" />
+                Daily balance
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <span className="h-3 w-3 rounded-full border-2 border-white bg-emerald-500" />
+                Recharge
+              </span>
+            </div>
             <div className="h-full min-h-[300px] w-full flex-1">
               {parsedData ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -339,6 +356,17 @@ export default function App() {
                       axisLine={false}
                     />
                     <Tooltip content={<CustomTooltip />} />
+                    {chartData
+                      .filter((point) => point.rechargeAmount)
+                      .map((point) => (
+                        <ReferenceLine
+                          key={`recharge-line-${point.date}`}
+                          x={point.date}
+                          stroke="#10b981"
+                          strokeDasharray="3 3"
+                          strokeOpacity={0.45}
+                        />
+                      ))}
                     <Line
                       type="stepAfter"
                       dataKey="balance"
@@ -350,7 +378,7 @@ export default function App() {
                           cx?: number
                           cy?: number
                           index?: number
-                          payload?: ChartPoint
+                          payload?: SimulationPoint
                         }
                         if (!payload?.rechargeAmount || cx === undefined || cy === undefined) {
                           return <g key={`dot-${index ?? payload?.date ?? 'x'}`} />
@@ -360,7 +388,7 @@ export default function App() {
                             key={`recharge-${payload.date}`}
                             cx={cx}
                             cy={cy}
-                            r={4}
+                            r={5}
                             fill="#10b981"
                             stroke="#fff"
                             strokeWidth={2}

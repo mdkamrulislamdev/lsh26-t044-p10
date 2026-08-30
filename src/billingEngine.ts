@@ -70,7 +70,10 @@ export type SimulationResult = {
   finalState: PredictionState
 }
 
-/** YYYY-MM-DD → year + 0-based month, without UTC timezone shift. */
+/** Round taka to two decimal places (paisa). */
+export function roundTaka(value: number): number {
+  return parseFloat(value.toFixed(2))
+}
 export function calendarMonthKey(isoDate: string): string {
   const [year, month] = isoDate.split('-')
   return `${year}-${Number(month) - 1}`
@@ -98,7 +101,7 @@ export function calculateEnergyCost(dailyUnits: number, monthRunningUnits: numbe
     }
   }
 
-  return totalCost
+  return roundTaka(totalCost)
 }
 
 /**
@@ -143,8 +146,8 @@ export function runSimulation(
     })
 
     const rawEnergyCost = calculateEnergyCost(dayObj.units, monthRunningUnits)
-    const vat = rawEnergyCost * VAT_MULTIPLIER
-    const totalDailyConsumptionCost = rawEnergyCost + vat
+    const vat = roundTaka(rawEnergyCost * VAT_MULTIPLIER)
+    const totalDailyConsumptionCost = roundTaka(rawEnergyCost + vat)
 
     balance -= totalDailyConsumptionCost
     monthRunningUnits += dayObj.units
@@ -234,7 +237,6 @@ export function runPredictions(
 
   let currentDate = date
   let runOutDate: string | null = null
-  let simulatedCostToTarget = 0
 
   const breakdown: PredictionBreakdown = { energy: 0, vat: 0, fixedCharges: 0, slabPenalty: 0 }
   const baseSlabCost = 4.63
@@ -255,18 +257,16 @@ export function runPredictions(
     }
 
     const energyCost = calculateEnergyCost(usualDailyUnits, monthRunningUnits)
-    const vat = energyCost * VAT_MULTIPLIER
-    const dailyTotal = energyCost + vat
+    const vat = roundTaka(energyCost * VAT_MULTIPLIER)
+    const dailyTotal = roundTaka(energyCost + vat)
 
     if (dateStr <= targetDate) {
-      simulatedCostToTarget += dailyTotal
       breakdown.energy += energyCost
       breakdown.vat += vat
       breakdown.slabPenalty += energyCost - usualDailyUnits * baseSlabCost
 
       if (!hasPaidFixedChargesThisMonth && daysSimulated === 1) {
         const fixed = METER_RENT + DEMAND_CHARGE
-        simulatedCostToTarget += fixed
         breakdown.fixedCharges += fixed
         hasPaidFixedChargesThisMonth = true
       }
@@ -284,14 +284,18 @@ export function runPredictions(
     }
   }
 
+  const energy = roundTaka(breakdown.energy)
+  const vat = roundTaka(energy * VAT_MULTIPLIER)
+  const fixedCharges = roundTaka(breakdown.fixedCharges)
+
   return {
     runOutDate,
-    amountNeededToday: simulatedCostToTarget > 0 ? parseFloat(simulatedCostToTarget.toFixed(2)) : 0,
+    amountNeededToday: roundTaka(energy + vat + fixedCharges),
     breakdown: {
-      energy: parseFloat(breakdown.energy.toFixed(2)),
-      vat: parseFloat(breakdown.vat.toFixed(2)),
-      fixedCharges: parseFloat(breakdown.fixedCharges.toFixed(2)),
-      slabPenalty: parseFloat(breakdown.slabPenalty.toFixed(2)),
+      energy,
+      vat,
+      fixedCharges,
+      slabPenalty: roundTaka(breakdown.slabPenalty),
     },
   }
 }
@@ -350,8 +354,8 @@ export function compareHabits(
       }
 
       const energyCost = calculateEnergyCost(day.units, monthRunningUnits)
-      const vat = energyCost * VAT_MULTIPLIER
-      const dailyConsumptionCost = energyCost + vat
+      const vat = roundTaka(energyCost * VAT_MULTIPLIER)
+      const dailyConsumptionCost = roundTaka(energyCost + vat)
 
       balance -= dailyConsumptionCost
       totalCost += dailyConsumptionCost

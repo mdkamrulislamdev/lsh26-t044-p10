@@ -79,7 +79,7 @@ function collectCaseIssues(testCase, simulationResult, predictions, comparison) 
   }
 
   history.forEach((point) => {
-    if (!almost(point.vat, point.rawEnergyCost * VAT_MULTIPLIER, 1e-8)) {
+    if (!almost(point.vat, point.rawEnergyCost * VAT_MULTIPLIER, 0.015)) {
       issues.push(`VAT mismatch on ${point.date}: ${point.vat} vs 5% of ${point.rawEnergyCost}`)
     }
     if (point.fixedChargesTaken !== 0 && !almost(point.fixedChargesTaken, FIXED)) {
