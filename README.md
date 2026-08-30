@@ -61,7 +61,7 @@ npm run preview
 3. Paste into **Data Input** and click **Load Data**.
 4. Confirm **Loaded ✓**, the step chart, green recharge dots, forecast cards, and habit totals.
 
-Engine logic lives in `src/billingEngine.ts` (slabs, simulation, predictions, habit comparison). The UI is `src/App.tsx`.
+Engine logic lives in `src/billingEngine.ts` (slabs, simulation, predictions, habit comparison). The UI is `src/App.tsx`. How a click becomes a taka amount is explained in **[architecture.md](./architecture.md)** (written for non-specialists as well as builders).
 
 **Tariff constants (do not treat as a live DESCO feed):** slabs 4.63 / 5.26 / 5.63 / 5.83 / 9.30 / 10.70 BDT per unit; VAT 5% on energy only; meter rent 40 + demand 42.
 
