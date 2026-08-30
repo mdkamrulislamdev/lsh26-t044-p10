@@ -14,7 +14,7 @@ Four required tabs, in order: **Household → Balance → Questions → Habits**
 
 Third-party licenses: [`LICENSES.md`](./LICENSES.md). Application license: [`LICENSE`](./LICENSE) (MIT). How the engine works: [`architecture.md`](./architecture.md). Event fields: [`EVENT.md`](./EVENT.md). Judge pack: [`evaluation-manifest.json`](./evaluation-manifest.json).
 
-**Demo video:** _add the ≤ 60 second link here after upload._
+**Demo video:** https://drive.google.com/file/d/1dfHNLzB4Jr4lqTQX1tHbj8ayLll9Ndfc/view?usp=sharing
 
 ---
 
@@ -110,7 +110,7 @@ Empty or invalid JSON shows an error and does not crash. Other tabs send you bac
 |---|---|
 | Kamrul (`mdkamrulislamdev`) | Product: four-tab UI, household JSON, billing engine (slabs, simulation, predictions, habits), stay-on Plan bonus, tests, README / licenses / architecture / evaluation-manifest, live deploy |
 
-Add other registered members here if the arena lists more than one.
+
 
 ---
 
