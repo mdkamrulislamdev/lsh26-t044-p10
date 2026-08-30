@@ -30,15 +30,6 @@ function almost(a, b, eps = EPS) {
   return Math.abs(a - b) <= eps
 }
 
-function addCalendarDays(isoDate, days) {
-  const [year, month, day] = isoDate.split('-').map(Number)
-  const next = new Date(year, month - 1, day + days)
-  const yyyy = String(next.getFullYear())
-  const mm = String(next.getMonth() + 1).padStart(2, '0')
-  const dd = String(next.getDate()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd}`
-}
-
 function runUnitChecks() {
   const checks = [
     {
@@ -133,18 +124,16 @@ function collectCaseIssues(testCase, simulationResult, predictions, comparison) 
     }
 
     const today = testCase.today
-    const tomorrow = addCalendarDays(today, 1)
-    const stillThisMonth = tomorrow.substring(0, 7) === today.substring(0, 7)
     const paidThisMonth = history
       .filter((row) => row.date.substring(0, 7) === today.substring(0, 7))
       .some((row) => row.fixedChargesTaken > 0)
 
-    if (stillThisMonth && paidThisMonth && !almost(fixed, 0, 0.01)) {
+    if (paidThisMonth && !almost(fixed, 0, 0.01)) {
       issues.push(
         `Already recharged this month; target breakdown should show 0 fixed charges, got ${fixed}`,
       )
     }
-    if (stillThisMonth && !paidThisMonth && !almost(fixed, FIXED, 0.01)) {
+    if (!paidThisMonth && !almost(fixed, FIXED, 0.01)) {
       issues.push(
         `No recharge yet this month; target breakdown should include ${FIXED} fixed charges, got ${fixed}`,
       )

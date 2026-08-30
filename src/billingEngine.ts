@@ -220,7 +220,9 @@ function isFirstDayOfMonth(isoDate: string): boolean {
 
 /**
  * PHASE 9: Prediction Algorithm
- * Calculates when the balance will run out and how much is needed to hit a target.
+ * Run-out date from today's balance at usual daily use.
+ * Amount to recharge today to last until targetDate: energy + higher-slab extra +
+ * at most one month of fixed charges (today's month only) + 5% VAT on energy.
  */
 export function runPredictions(
   currentState: PredictionState,
@@ -241,6 +243,12 @@ export function runPredictions(
   const breakdown: PredictionBreakdown = { energy: 0, vat: 0, fixedCharges: 0, slabPenalty: 0 }
   const baseSlabCost = 4.63
 
+  // One recharge today is a first-of-month charge only if this calendar month has not
+  // already taken rent+demand. Later months in this path have no extra recharges.
+  if (!hasPaidFixedChargesThisMonth) {
+    breakdown.fixedCharges = METER_RENT + DEMAND_CHARGE
+  }
+
   const maxSimulationDays = 365
   let daysSimulated = 0
 
@@ -253,7 +261,6 @@ export function runPredictions(
     if (currentMonth !== monthKey) {
       currentMonth = monthKey
       monthRunningUnits = 0
-      hasPaidFixedChargesThisMonth = false
     }
 
     const energyCost = calculateEnergyCost(usualDailyUnits, monthRunningUnits)
@@ -264,12 +271,6 @@ export function runPredictions(
       breakdown.energy += energyCost
       breakdown.vat += vat
       breakdown.slabPenalty += energyCost - usualDailyUnits * baseSlabCost
-
-      if (!hasPaidFixedChargesThisMonth && daysSimulated === 1) {
-        const fixed = METER_RENT + DEMAND_CHARGE
-        breakdown.fixedCharges += fixed
-        hasPaidFixedChargesThisMonth = true
-      }
     }
 
     balance -= dailyTotal

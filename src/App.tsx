@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   CartesianGrid,
   Line,
@@ -9,7 +9,13 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { compareHabits, runPredictions, runSimulation, type SimulationPoint } from './billingEngine'
+import {
+  calendarMonthKey,
+  compareHabits,
+  runPredictions,
+  runSimulation,
+  type SimulationPoint,
+} from './billingEngine'
 import household from './data/household.json'
 
 const HOUSEHOLD_JSON = JSON.stringify(household, null, 2)
@@ -144,6 +150,7 @@ export default function App() {
   const [jsonInput, setJsonInput] = useState('')
   const [parsedData, setParsedData] = useState<ParsedData | null>(null)
   const [error, setError] = useState('')
+  const [targetDate, setTargetDate] = useState('')
 
   const handleLoadData = () => {
     setError('')
@@ -168,6 +175,10 @@ export default function App() {
     }
   }
 
+  useEffect(() => {
+    setTargetDate(parsedData?.target_date ?? '')
+  }, [parsedData])
+
   const simulation = useMemo(() => {
     if (!parsedData) return null
     return runSimulation(
@@ -180,17 +191,29 @@ export default function App() {
   const chartData = simulation?.history ?? []
 
   const predictions = useMemo(() => {
-    if (!parsedData || !simulation?.finalState.date) return null
-    if (parsedData.usual_daily_units === undefined || !parsedData.target_date) return null
+    if (!parsedData || !simulation?.history.length) return null
+    if (parsedData.usual_daily_units === undefined || !targetDate) return null
+
+    const todayState =
+      simulation.history.find((row) => row.date === parsedData.today) ??
+      simulation.history[simulation.history.length - 1]
+    const today = parsedData.today ?? todayState.date
+    const paidThisMonth = simulation.history
+      .filter((row) => row.date.substring(0, 7) === today.substring(0, 7))
+      .some((row) => row.fixedChargesTaken > 0)
+
     return runPredictions(
       {
-        ...simulation.finalState,
-        date: parsedData.today ?? simulation.finalState.date,
+        balance: todayState.balance,
+        date: today,
+        currentMonth: calendarMonthKey(today),
+        monthRunningUnits: todayState.monthRunningUnits,
+        hasPaidFixedChargesThisMonth: paidThisMonth,
       },
       parsedData.usual_daily_units,
-      parsedData.target_date,
+      targetDate,
     )
-  }, [parsedData, simulation])
+  }, [parsedData, simulation, targetDate])
 
   const habitResult = useMemo(() => {
     if (!parsedData?.comparison) return null
@@ -276,40 +299,51 @@ export default function App() {
               <div className="flex flex-col gap-4">
                 <div className="rounded-lg border border-red-200 bg-red-50 p-4">
                   <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-red-600">
-                    Balance Depletion Warning
+                    Date Balance Runs Out
                   </p>
                   <p className="mb-2 text-sm text-slate-700">
-                    Based on usual usage of{' '}
-                    <span className="font-bold">{parsedData.usual_daily_units ?? '—'} units/day</span>
-                    , runs out on:
+                    Today&apos;s rebuilt balance, then {parsedData.usual_daily_units ?? '—'} usual
+                    units/day (slab resets on the 1st):
                   </p>
                   <p className="text-2xl font-bold text-red-700">{formatLongDate(predictions?.runOutDate)}</p>
                 </div>
                 <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
                   <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-blue-600">
-                    Target Recharge
+                    Amount Needed Today (BDT)
                   </p>
-                  <p className="mb-2 text-sm text-slate-700">
-                    To last until <span className="font-bold">{parsedData.target_date ?? '—'}</span>,
-                    recharge today:
-                  </p>
+                  <label className="mb-2 block text-sm text-slate-700" htmlFor="target-date">
+                    Last until a date you pick
+                    <input
+                      id="target-date"
+                      type="date"
+                      value={targetDate}
+                      min={parsedData.today}
+                      onChange={(event) => setTargetDate(event.target.value)}
+                      className="mt-1 w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    />
+                  </label>
                   <p className="mb-3 text-2xl font-bold text-blue-700">
                     {formatBdt(predictions?.amountNeededToday ?? 0)}
+                  </p>
+                  <p className="mb-2 text-xs text-slate-600">
+                    One top-up today. Fixed charges (৳82) only if this calendar month has not already
+                    taken rent+demand. Later months in this path add no extra ৳82.
                   </p>
                   <div className="space-y-1 rounded bg-white/60 p-2 text-xs text-slate-600">
                     <div className="flex justify-between">
                       <span>Energy:</span> <span>{formatBdt(predictions?.breakdown.energy ?? 0)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Slab Penalty:</span>{' '}
+                      <span>Higher-slab extra:</span>{' '}
                       <span>{formatBdt(predictions?.breakdown.slabPenalty ?? 0)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Fixed Charges:</span>{' '}
+                      <span>Fixed charges (rent + demand):</span>{' '}
                       <span>{formatBdt(predictions?.breakdown.fixedCharges ?? 0)}</span>
                     </div>
                     <div className="mt-1 flex justify-between border-t border-blue-200 pt-1 font-semibold">
-                      <span>VAT (5%):</span> <span>{formatBdt(predictions?.breakdown.vat ?? 0)}</span>
+                      <span>VAT (5% of energy):</span>{' '}
+                      <span>{formatBdt(predictions?.breakdown.vat ?? 0)}</span>
                     </div>
                   </div>
                 </div>
