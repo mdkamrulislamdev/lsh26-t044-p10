@@ -9,6 +9,9 @@ import {
   YAxis,
 } from 'recharts'
 import { compareHabits, runPredictions, runSimulation } from './billingEngine'
+import household from './data/household.json'
+
+const HOUSEHOLD_JSON = JSON.stringify(household, null, 2)
 
 type MeterDay = {
   date: string
@@ -152,6 +155,17 @@ export default function App() {
     }
   }
 
+  const handleLoadHousehold = () => {
+    setJsonInput(HOUSEHOLD_JSON)
+    setError('')
+    try {
+      setParsedData(extractCase(household))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load household.')
+      setParsedData(null)
+    }
+  }
+
   const simulation = useMemo(() => {
     if (!parsedData) return null
     return runSimulation(
@@ -221,18 +235,31 @@ export default function App() {
             </h2>
             <textarea
               className="mb-3 h-32 w-full resize-y rounded-lg border border-slate-300 bg-slate-50 p-3 font-mono text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500"
-              placeholder="Paste JSON here..."
+              placeholder="Paste JSON here, or load the six-month Dhaka household."
               value={jsonInput}
               onChange={(event) => setJsonInput(event.target.value)}
             />
             {error ? <p className="mb-3 text-xs font-medium text-red-500">{error}</p> : null}
-            <button
-              type="button"
-              onClick={handleLoadData}
-              className="w-full rounded-lg bg-slate-800 px-4 py-2 font-medium text-white transition-colors hover:bg-slate-900"
-            >
-              Load Data
-            </button>
+            <p className="mb-3 text-xs leading-5 text-slate-500">
+              Built-in household HH-DHAKA-01: Jan–Jun 2026 daily units (light January, heavy May),
+              plus a 5,000 BDT top-up on 28 Jun (last week of the month).
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={handleLoadHousehold}
+                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 font-medium text-slate-800 transition-colors hover:border-slate-800"
+              >
+                Load 6-month household
+              </button>
+              <button
+                type="button"
+                onClick={handleLoadData}
+                className="w-full rounded-lg bg-slate-800 px-4 py-2 font-medium text-white transition-colors hover:bg-slate-900"
+              >
+                Load Data
+              </button>
+            </div>
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
