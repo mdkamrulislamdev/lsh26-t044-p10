@@ -11,9 +11,6 @@ All application source in this repository is original work for LofiStack Hackath
 | [react](https://www.npmjs.com/package/react) | MIT | UI |
 | [react-dom](https://www.npmjs.com/package/react-dom) | MIT | UI |
 | [recharts](https://www.npmjs.com/package/recharts) | MIT | Balance history chart |
-| [clsx](https://www.npmjs.com/package/clsx) | MIT | Class name helper |
-| [tailwind-merge](https://www.npmjs.com/package/tailwind-merge) | MIT | Class name helper |
-| [lucide-react](https://www.npmjs.com/package/lucide-react) | ISC | Icons (present in repo; not required on the main Meter Advisor screen) |
 
 ## Build / toolchain
 
@@ -35,8 +32,9 @@ Transitive packages are those installed by npm from the licenses of the packages
 
 | Asset | License | Source |
 |---|---|---|
-| IBM Plex Sans | SIL Open Font License 1.1 | [Google Fonts](https://fonts.google.com/specimen/IBM+Plex+Sans) |
+| Source Serif 4 | SIL Open Font License 1.1 | [Google Fonts](https://fonts.google.com/specimen/Source+Serif+4) |
+| DM Sans | SIL Open Font License 1.1 | [Google Fonts](https://fonts.google.com/specimen/DM+Sans) |
 
 ## Data
 
-`docs/P10_prepaid_meter_public.json` / `public/P10_prepaid_meter_public.json` is the public P10 case file supplied with the hackathon problem. It is used only as sample input for this solution.
+`docs/P10_prepaid_meter_public.json` is the public P10 case file from the problem pack. It is gitignored and used only by `npm run test:engine`. The app ships `src/data/household.json`.

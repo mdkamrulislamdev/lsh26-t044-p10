@@ -22,4 +22,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-docs/*  
+docs/*
+public/P10_prepaid_meter_public.json 

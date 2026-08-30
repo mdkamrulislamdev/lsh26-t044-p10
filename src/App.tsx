@@ -21,10 +21,10 @@ import household from './data/household.json'
 const HOUSEHOLD_JSON = JSON.stringify(household, null, 2)
 
 const SECTIONS = [
-  { id: 'household', label: 'Household' },
-  { id: 'balance', label: 'Balance' },
-  { id: 'questions', label: 'Questions' },
-  { id: 'habits', label: 'Habits' },
+  { id: 'household', step: '1', label: 'Household', hint: 'Load readings' },
+  { id: 'balance', step: '2', label: 'Balance', hint: 'Day-by-day line' },
+  { id: 'questions', step: '3', label: 'Questions', hint: 'Run out & top up' },
+  { id: 'habits', step: '4', label: 'Habits', hint: 'Low vs monthly' },
 ] as const
 
 type SectionId = (typeof SECTIONS)[number]['id']
@@ -200,16 +200,12 @@ function CustomTooltip({ active, payload, label }: TooltipViewProps) {
   if (!active || !payload?.length) return null
   const data = payload[0].payload
   return (
-    <div className="rounded-lg bg-slate-800 px-3 py-2 text-sm text-white shadow-lg">
+    <div className="rounded-xl bg-ink px-3 py-2 text-sm text-surface shadow-lg">
       <p>{label}</p>
-      <p className="font-mono">{formatBdt(data.balance)}</p>
+      <p className="font-medium">{formatBdt(data.balance)}</p>
       {data.rechargeAmount ? <p>Recharge {formatBdt(data.rechargeAmount)}</p> : null}
     </div>
   )
-}
-
-function NeedHousehold() {
-  return <p className="text-sm text-slate-500">Load a household first.</p>
 }
 
 export default function App() {
@@ -222,7 +218,7 @@ export default function App() {
   const handleLoadData = () => {
     setError('')
     try {
-      if (!jsonInput.trim()) throw new Error('Input is empty.')
+      if (!jsonInput.trim()) throw new Error('Paste JSON first, or load the six-month household.')
       const data: unknown = JSON.parse(jsonInput)
       setParsedData(extractCase(data))
     } catch (err) {
@@ -289,15 +285,59 @@ export default function App() {
   }, [parsedData])
 
   const comparison = parsedData?.comparison
-  const todayBalance = simulation?.history.find((row) => row.date === parsedData?.today)?.balance
-    ?? simulation?.finalState.balance
+  const todayBalance =
+    simulation?.history.find((row) => row.date === parsedData?.today)?.balance ??
+    simulation?.finalState.balance
+
+  const needHousehold = (
+    <div className="rounded-2xl border border-dashed border-line bg-canvas/60 px-6 py-10 text-center">
+      <p className="text-sm text-muted">Start on Household and load readings first.</p>
+      <button
+        type="button"
+        onClick={() => setSection('household')}
+        className="mt-4 rounded-full bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark"
+      >
+        Go to Household
+      </button>
+    </div>
+  )
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 font-sans text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-4 sm:px-6">
-          <h1 className="text-lg font-semibold text-slate-900">Prepaid meter</h1>
-          <nav className="flex flex-wrap gap-2" aria-label="Sections">
+    <div className="flex min-h-screen flex-col text-ink">
+      <header className="border-b border-line bg-surface/90 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-5 sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-white">
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M13 3L6 13h5l-1 8 8-11h-5l1-7z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </span>
+              <div>
+                <p className="font-display text-xl font-semibold tracking-tight">MeterWise</p>
+                <p className="text-xs text-muted">Prepaid meter recharge advisor</p>
+              </div>
+            </div>
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-medium ${
+                parsedData
+                  ? 'bg-brand-soft text-brand-dark'
+                  : 'bg-alert-soft text-alert'
+              }`}
+            >
+              {parsedData ? 'Household loaded' : 'Waiting for household'}
+            </span>
+          </div>
+
+          <p className="text-sm text-muted">
+            Use the four tabs in order: load the family → read the line → answer the two questions →
+            compare habits.
+          </p>
+
+          <nav className="grid grid-cols-2 gap-2 md:grid-cols-4" aria-label="Sections">
             {SECTIONS.map((item) => {
               const active = section === item.id
               return (
@@ -305,13 +345,17 @@ export default function App() {
                   key={item.id}
                   type="button"
                   onClick={() => setSection(item.id)}
-                  className={`rounded-lg px-3 py-2 text-sm font-medium ${
+                  className={`rounded-2xl border px-3 py-3 text-left transition-colors ${
                     active
-                      ? 'bg-slate-900 text-white'
-                      : 'border border-slate-200 bg-white text-slate-700 hover:border-slate-400'
+                      ? 'border-brand bg-brand-soft'
+                      : 'border-line bg-surface hover:border-brand/40'
                   }`}
                 >
-                  {item.label}
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-muted">
+                    {item.step}
+                  </span>
+                  <span className="mt-0.5 block text-sm font-semibold">{item.label}</span>
+                  <span className="mt-0.5 block text-xs text-muted">{item.hint}</span>
                 </button>
               )
             })}
@@ -319,88 +363,103 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6">
         {section === 'household' ? (
-          <section className="rounded-xl border border-slate-200 bg-white p-5">
-            <h2 className="text-base font-semibold text-slate-900">Household</h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Six months of daily units, with a light month, a heavy summer month, and a large
-              recharge in the last week of a month.
+          <section className="rounded-3xl border border-line bg-surface p-6 shadow-sm sm:p-8">
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted">
+              Dhaka · prepaid electricity
+            </p>
+            <h2 className="font-display mt-2 text-3xl font-semibold tracking-tight">Household</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+              Click <span className="font-medium text-ink">Load 6-month household</span> for the
+              built-in family (light January, heavy May, ৳5,000 on 28 June). Or paste a judge case
+              and load that instead.
             </p>
             <textarea
-              className="mt-4 h-28 w-full resize-y rounded-lg border border-slate-300 bg-slate-50 p-3 font-mono text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400"
-              placeholder="Or paste household JSON"
+              className="mt-5 h-32 w-full resize-y rounded-2xl border border-line bg-canvas/70 p-4 font-mono text-xs text-ink focus:outline-none focus:ring-2 focus:ring-brand/40"
+              placeholder='Paste JSON here, or use “Load 6-month household”.'
               value={jsonInput}
               onChange={(event) => setJsonInput(event.target.value)}
             />
-            {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            {error ? <p className="mt-3 text-sm text-alert">{error}</p> : null}
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
               <button
                 type="button"
                 onClick={handleLoadHousehold}
-                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                className="rounded-full bg-brand px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-dark"
               >
                 Load 6-month household
               </button>
               <button
                 type="button"
                 onClick={handleLoadData}
-                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:border-slate-800"
+                className="rounded-full border border-line bg-surface px-5 py-2.5 text-sm font-medium hover:border-ink/30"
               >
                 Load pasted JSON
               </button>
             </div>
             {facts ? (
-              <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
-                <div>
-                  <dt className="text-slate-500">Months</dt>
-                  <dd className="font-medium text-slate-900">{facts.monthCount}</dd>
-                </div>
-                <div>
-                  <dt className="text-slate-500">Light month</dt>
-                  <dd className="font-medium text-slate-900">
-                    {monthLabel(facts.lightMonth)} · {facts.lightUnits} units
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-slate-500">Heavy month</dt>
-                  <dd className="font-medium text-slate-900">
-                    {monthLabel(facts.heavyMonth)} · {facts.heavyUnits} units
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-slate-500">Last-week recharge</dt>
-                  <dd className="font-medium text-slate-900">
-                    {facts.lastWeekRecharge
-                      ? `${formatBdt(facts.lastWeekRecharge.amount)} on ${formatLongDate(facts.lastWeekRecharge.date)}`
-                      : 'None'}
-                  </dd>
-                </div>
-              </dl>
+              <div className="mt-6 border-t border-line pt-6">
+                <p className="text-sm font-medium text-brand-dark">This household is ready.</p>
+                <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
+                  <div className="rounded-2xl bg-canvas/80 p-4">
+                    <dt className="text-muted">Months</dt>
+                    <dd className="mt-1 text-lg font-semibold">{facts.monthCount}</dd>
+                  </div>
+                  <div className="rounded-2xl bg-canvas/80 p-4">
+                    <dt className="text-muted">Light month</dt>
+                    <dd className="mt-1 text-lg font-semibold">
+                      {monthLabel(facts.lightMonth)} · {facts.lightUnits} units
+                    </dd>
+                  </div>
+                  <div className="rounded-2xl bg-canvas/80 p-4">
+                    <dt className="text-muted">Heavy month</dt>
+                    <dd className="mt-1 text-lg font-semibold">
+                      {monthLabel(facts.heavyMonth)} · {facts.heavyUnits} units
+                    </dd>
+                  </div>
+                  <div className="rounded-2xl bg-canvas/80 p-4">
+                    <dt className="text-muted">Last-week recharge</dt>
+                    <dd className="mt-1 text-lg font-semibold">
+                      {facts.lastWeekRecharge
+                        ? `${formatBdt(facts.lastWeekRecharge.amount)} on ${formatLongDate(facts.lastWeekRecharge.date)}`
+                        : 'None'}
+                    </dd>
+                  </div>
+                </dl>
+                <button
+                  type="button"
+                  onClick={() => setSection('balance')}
+                  className="mt-5 rounded-full bg-brand px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-dark"
+                >
+                  Next: Balance
+                </button>
+              </div>
             ) : null}
           </section>
         ) : null}
 
         {section === 'balance' ? (
-          <section className="rounded-xl border border-slate-200 bg-white p-5">
-            <h2 className="text-base font-semibold text-slate-900">Day-by-day balance</h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Each day’s units at the month’s running slab. Demand charge and meter rent on the
-              first recharge of the month. VAT on energy. Green marks are recharges.
+          <section className="rounded-3xl border border-line bg-surface p-6 shadow-sm sm:p-8">
+            <h2 className="font-display text-3xl font-semibold tracking-tight">Day-by-day balance</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+              Each day is priced at the month’s running slab. ৳82 (rent + demand) on the first
+              recharge of a month. 5% VAT on energy only. Green marks are recharges — hover one to
+              read the amount.
             </p>
-            <div className="mt-4 h-[420px] w-full">
+            <div className="mt-6 h-[420px] w-full">
               {parsedData ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <LineChart data={chartData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4dfd4" />
                     <XAxis
                       dataKey="date"
-                      tick={{ fill: '#64748b', fontSize: 12 }}
+                      tick={{ fill: '#5c6358', fontSize: 12 }}
                       tickFormatter={(value: string) => value.slice(5)}
                       tickLine={false}
                       axisLine={false}
                     />
-                    <YAxis tick={{ fill: '#64748b', fontSize: 12 }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fill: '#5c6358', fontSize: 12 }} tickLine={false} axisLine={false} />
                     <Tooltip content={<CustomTooltip />} />
                     {chartData
                       .filter((point) => point.rechargeAmount)
@@ -408,7 +467,7 @@ export default function App() {
                         <ReferenceLine
                           key={`recharge-line-${point.date}`}
                           x={point.date}
-                          stroke="#10b981"
+                          stroke="#0f9f6e"
                           strokeDasharray="3 3"
                           strokeOpacity={0.45}
                         />
@@ -416,9 +475,9 @@ export default function App() {
                     <Line
                       type="stepAfter"
                       dataKey="balance"
-                      stroke="#0f172a"
+                      stroke="#17211a"
                       strokeWidth={2}
-                      activeDot={{ r: 5, fill: '#0f172a', stroke: '#fff' }}
+                      activeDot={{ r: 5, fill: '#0b6e4f', stroke: '#fff' }}
                       dot={(props) => {
                         const { cx, cy, payload, index } = props as {
                           cx?: number
@@ -435,7 +494,7 @@ export default function App() {
                             cx={cx}
                             cy={cy}
                             r={5}
-                            fill="#10b981"
+                            fill="#0f9f6e"
                             stroke="#fff"
                             strokeWidth={2}
                           />
@@ -445,109 +504,136 @@ export default function App() {
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
-                <NeedHousehold />
+                needHousehold
               )}
             </div>
+            {parsedData ? (
+              <button
+                type="button"
+                onClick={() => setSection('questions')}
+                className="mt-6 rounded-full bg-brand px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-dark"
+              >
+                Next: Questions
+              </button>
+            ) : null}
           </section>
         ) : null}
 
         {section === 'questions' ? (
-          <section className="rounded-xl border border-slate-200 bg-white p-5">
-            <h2 className="text-base font-semibold text-slate-900">Two questions</h2>
+          <section className="rounded-3xl border border-line bg-surface p-6 shadow-sm sm:p-8">
+            <h2 className="font-display text-3xl font-semibold tracking-tight">Two questions</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+              Left: when today’s rebuilt balance runs out at usual daily use. Right: pick a date,
+              then see how much to recharge today, split into energy, higher slab, fixed charges,
+              and VAT.
+            </p>
             {!parsedData ? (
-              <div className="mt-4">
-                <NeedHousehold />
-              </div>
+              <div className="mt-6">{needHousehold}</div>
             ) : (
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <div className="rounded-lg border border-slate-200 p-4">
-                  <p className="text-sm text-slate-600">When does the balance run out?</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Today {formatBdt(todayBalance)} · {parsedData.usual_daily_units ?? '—'} units/day
-                  </p>
-                  <p className="mt-3 text-2xl font-semibold text-slate-900">
-                    {formatLongDate(predictions?.runOutDate)}
-                  </p>
+              <>
+                <div className="mt-6 grid gap-4 md:grid-cols-2">
+                  <div className="rounded-2xl border border-alert/20 bg-alert-soft p-5">
+                    <p className="text-sm font-medium text-alert">When does the balance run out?</p>
+                    <p className="mt-1 text-xs text-muted">
+                      Today {formatBdt(todayBalance)} · {parsedData.usual_daily_units ?? '—'} units/day
+                    </p>
+                    <p className="mt-4 font-display text-3xl font-semibold text-ink">
+                      {formatLongDate(predictions?.runOutDate)}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-brand/20 bg-brand-soft p-5">
+                    <p className="text-sm font-medium text-brand-dark">
+                      How much to recharge today to last until
+                    </p>
+                    <input
+                      id="target-date"
+                      type="date"
+                      value={targetDate}
+                      min={parsedData.today}
+                      onChange={(event) => setTargetDate(event.target.value)}
+                      className="mt-3 w-full rounded-xl border border-brand/20 bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/40"
+                    />
+                    <p className="mt-4 font-display text-3xl font-semibold text-ink">
+                      {targetDate ? formatBdt(predictions?.amountNeededToday) : 'Pick a date'}
+                    </p>
+                    {targetDate ? (
+                      <dl className="mt-4 space-y-2 text-sm">
+                        <div className="flex justify-between gap-4">
+                          <dt className="text-muted">Energy</dt>
+                          <dd>{formatBdt(predictions?.breakdown.energy)}</dd>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <dt className="text-muted">Higher slab</dt>
+                          <dd>{formatBdt(predictions?.breakdown.slabPenalty)}</dd>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <dt className="text-muted">Fixed charges</dt>
+                          <dd>{formatBdt(predictions?.breakdown.fixedCharges)}</dd>
+                        </div>
+                        <div className="flex justify-between gap-4 border-t border-brand/20 pt-2">
+                          <dt className="text-muted">VAT</dt>
+                          <dd>{formatBdt(predictions?.breakdown.vat)}</dd>
+                        </div>
+                      </dl>
+                    ) : null}
+                  </div>
                 </div>
-                <div className="rounded-lg border border-slate-200 p-4">
-                  <p className="text-sm text-slate-600">How much to recharge today to last until</p>
-                  <input
-                    id="target-date"
-                    type="date"
-                    value={targetDate}
-                    min={parsedData.today}
-                    onChange={(event) => setTargetDate(event.target.value)}
-                    className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400"
-                  />
-                  <p className="mt-3 text-2xl font-semibold text-slate-900">
-                    {targetDate ? formatBdt(predictions?.amountNeededToday) : 'Pick a date'}
-                  </p>
-                  {targetDate ? (
-                    <dl className="mt-3 space-y-1 text-sm text-slate-700">
-                      <div className="flex justify-between gap-4">
-                        <dt>Energy</dt>
-                        <dd>{formatBdt(predictions?.breakdown.energy)}</dd>
-                      </div>
-                      <div className="flex justify-between gap-4">
-                        <dt>Higher slab</dt>
-                        <dd>{formatBdt(predictions?.breakdown.slabPenalty)}</dd>
-                      </div>
-                      <div className="flex justify-between gap-4">
-                        <dt>Fixed charges</dt>
-                        <dd>{formatBdt(predictions?.breakdown.fixedCharges)}</dd>
-                      </div>
-                      <div className="flex justify-between gap-4">
-                        <dt>VAT</dt>
-                        <dd>{formatBdt(predictions?.breakdown.vat)}</dd>
-                      </div>
-                    </dl>
-                  ) : null}
-                </div>
-              </div>
+                <button
+                  type="button"
+                  onClick={() => setSection('habits')}
+                  className="mt-6 rounded-full bg-brand px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-dark"
+                >
+                  Next: Habits
+                </button>
+              </>
             )}
           </section>
         ) : null}
 
         {section === 'habits' ? (
-          <section className="rounded-xl border border-slate-200 bg-white p-5">
-            <h2 className="text-base font-semibold text-slate-900">Two habits</h2>
-            <p className="mt-1 text-sm text-slate-600">
+          <section className="rounded-3xl border border-line bg-surface p-6 shadow-sm sm:p-8">
+            <h2 className="font-display text-3xl font-semibold tracking-tight">Two habits</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
               Same three months
-              {comparison?.months.length ? ` (${comparison.months.join(', ')})` : ''}, same
-              consumption.
+              {comparison?.months.length ? ` (${comparison.months.join(', ')})` : ''}, same daily
+              units. Cost is energy + VAT + ৳82 when a month takes a recharge — not the money
+              deposited. A tie is allowed. Any gap is only how often ৳82 was taken.
             </p>
             {!parsedData ? (
-              <div className="mt-4">
-                <NeedHousehold />
-              </div>
+              <div className="mt-6">{needHousehold}</div>
             ) : !habitResult ? (
-              <p className="mt-4 text-sm text-slate-500">This household has no comparison months.</p>
+              <p className="mt-6 text-sm text-muted">This household has no comparison months.</p>
             ) : (
-              <div className="mt-4 space-y-4">
-                <p className="text-lg font-semibold text-slate-900">
-                  {habitResult.winner === 'Tie'
-                    ? `Same cost: ${formatBdt(habitResult.lowBalanceCost)}`
-                    : habitResult.winner === 'Low Balance'
-                      ? `Low balance costs less by ${formatBdt(habitResult.difference)}`
-                      : `Start of month costs less by ${formatBdt(habitResult.difference)}`}
-                </p>
+              <div className="mt-6 space-y-4">
+                <div className="rounded-2xl bg-brand-soft px-5 py-4">
+                  <p className="text-xs font-medium uppercase tracking-wider text-brand-dark">
+                    Which costs less
+                  </p>
+                  <p className="mt-1 font-display text-2xl font-semibold">
+                    {habitResult.winner === 'Tie'
+                      ? `Same cost: ${formatBdt(habitResult.lowBalanceCost)}`
+                      : habitResult.winner === 'Low Balance'
+                        ? `Low balance costs less by ${formatBdt(habitResult.difference)}`
+                        : `Start of month costs less by ${formatBdt(habitResult.difference)}`}
+                  </p>
+                </div>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div className="rounded-lg border border-slate-200 p-4">
-                    <h3 className="font-medium text-slate-900">When the balance runs low</h3>
-                    <p className="mt-1 text-sm text-slate-600">
-                      Recharge {comparison?.low_amount_bdt ?? '—'} when below{' '}
-                      {comparison?.low_threshold_bdt ?? '—'}
+                  <div className="rounded-2xl border border-line p-5">
+                    <h3 className="font-medium">When the balance runs low</h3>
+                    <p className="mt-1 text-sm text-muted">
+                      At the start of the day, if balance is below {comparison?.low_threshold_bdt ?? '—'},
+                      recharge {comparison?.low_amount_bdt ?? '—'}.
                     </p>
-                    <p className="mt-3 text-2xl font-semibold text-slate-900">
+                    <p className="mt-4 font-display text-3xl font-semibold">
                       {formatBdt(habitResult.lowBalanceCost)}
                     </p>
                   </div>
-                  <div className="rounded-lg border border-slate-200 p-4">
-                    <h3 className="font-medium text-slate-900">Start of each month</h3>
-                    <p className="mt-1 text-sm text-slate-600">
-                      Recharge {comparison?.monthly_amount_bdt ?? '—'} on the 1st
+                  <div className="rounded-2xl border border-line p-5">
+                    <h3 className="font-medium">Start of each month</h3>
+                    <p className="mt-1 text-sm text-muted">
+                      Recharge {comparison?.monthly_amount_bdt ?? '—'} on the 1st of each month.
                     </p>
-                    <p className="mt-3 text-2xl font-semibold text-slate-900">
+                    <p className="mt-4 font-display text-3xl font-semibold">
                       {formatBdt(habitResult.monthlyCost)}
                     </p>
                   </div>

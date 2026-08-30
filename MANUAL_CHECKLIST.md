@@ -1,20 +1,30 @@
 # Manual checking checklist (P10)
 
-Use a few distinct cases from `docs/P10_prepaid_meter_public.json`. Paste one case (or the full file) into Data Input and click **Load Data**. Automated engine checks: `npm run test:engine`.
+App tabs: **Household → Balance → Questions → Habits**. Engine: `npm run test:engine` (needs `docs/P10_prepaid_meter_public.json` locally).
 
-## Data & charting
+## Household
 
-- [ ] **Invalid input:** Paste broken text (not JSON). A red error appears; the app does not crash.
-- [ ] **Empty input:** Click Load Data with an empty box. Error: input is empty.
-- [ ] **Recharge markers:** Hover green dots. Tooltip date and recharge amount match that case’s `recharges` array.
+- [ ] **Load 6-month household:** at least 6 months; light month; heavy month; last-week recharge (built-in: Jan light, May heavy, ৳5,000 on 28 Jun).
+- [ ] **Empty paste:** Load pasted JSON with an empty box → error; no crash.
+- [ ] **Broken JSON:** paste `not json` → error; no crash.
 
-## Prediction rules
+## Balance
 
-- [ ] **Slab reset:** Pick a case whose run-out date is in a **later calendar month** than `today`. Daily cost should fall on the 1st when the slab counter returns to 4.63 BDT/unit.
-- [ ] **Fixed charges:** Target Recharge breakdown shows **82.00 BDT** only if there is **no** recharge yet in the current calendar month of `today`. If there already was one, fixed charges should be **0**. (If `today` is the last day of the month, the engine may charge 82 on the 1st of the *next* month — that is first-recharge-of-month on the first simulated day.)
-- [ ] **VAT:** VAT line is **exactly 5% of Energy**, not 5% of energy + fixed charges.
+- [ ] Line of daily balance after load.
+- [ ] Green marks match `recharges` (hover date + amount).
+- [ ] ৳82 only on the first recharge of a calendar month; VAT is 5% of energy.
 
-## Habit comparison
+## Questions
 
-- [ ] **Same energy:** Both habits use the same `days` / units. Cost difference is only from how many times **82 BDT** (meter rent + demand) is taken. Difference should be a multiple of 82 (including 0 = tie).
-- [ ] **Threshold:** Low Balance habit recharges on the day balance would sit **below** that case’s `low_threshold_bdt`, by `low_amount_bdt`.
+- [ ] Run-out date uses today’s rebuilt balance and usual daily units.
+- [ ] Pick a later date: amount needed today updates.
+- [ ] Breakdown has Energy, Higher slab, Fixed charges, VAT.
+- [ ] VAT = 5% of Energy, not of energy + 82.
+- [ ] Fixed charges are **82** if this month has no recharge yet, else **0**. Later months on this one top-up add no extra 82.
+
+## Habits (R-16, R-33)
+
+- [ ] Same three months, same daily units. Cost is energy + VAT + 82s, **not** deposits.
+- [ ] Low balance: recharge at **start of day** if balance is **below** the threshold.
+- [ ] Monthly: recharge on the **1st**. Both start from `comparison.opening_balance_bdt`.
+- [ ] Difference is a multiple of 82, including **0 (tie)**. No fabricated slab saving.
