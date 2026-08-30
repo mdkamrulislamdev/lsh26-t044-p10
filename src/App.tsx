@@ -398,9 +398,7 @@ export default function App() {
 
                 <div
                   className={`relative flex-1 overflow-hidden rounded-lg border p-4 ${
-                    monthlyWins || habitResult?.winner === 'Tie'
-                      ? 'border-emerald-200 bg-emerald-50'
-                      : 'border-slate-200 bg-white'
+                    monthlyWins ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white'
                   }`}
                 >
                   {monthlyWins ? (
@@ -408,27 +406,13 @@ export default function App() {
                       WINNER
                     </div>
                   ) : null}
-                  <h3
-                    className={`mb-1 font-bold ${
-                      monthlyWins || habitResult?.winner === 'Tie' ? 'text-emerald-900' : 'text-slate-800'
-                    }`}
-                  >
+                  <h3 className={`mb-1 font-bold ${monthlyWins ? 'text-emerald-900' : 'text-slate-800'}`}>
                     &quot;1st of Month&quot; Habit
                   </h3>
-                  <p
-                    className={`mb-4 text-xs ${
-                      monthlyWins || habitResult?.winner === 'Tie'
-                        ? 'text-emerald-700/70'
-                        : 'text-slate-500'
-                    }`}
-                  >
+                  <p className={`mb-4 text-xs ${monthlyWins ? 'text-emerald-700/70' : 'text-slate-500'}`}>
                     Recharge {comparison?.monthly_amount_bdt ?? '—'} BDT on the 1st of each month.
                   </p>
-                  <div
-                    className={`mb-1 text-3xl font-bold ${
-                      monthlyWins || habitResult?.winner === 'Tie' ? 'text-emerald-700' : 'text-slate-800'
-                    }`}
-                  >
+                  <div className={`mb-1 text-3xl font-bold ${monthlyWins ? 'text-emerald-700' : 'text-slate-800'}`}>
                     {formatBdt(habitResult?.monthlyCost ?? 0)}
                   </div>
                   <p

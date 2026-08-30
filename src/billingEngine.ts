@@ -71,7 +71,7 @@ export type SimulationResult = {
 }
 
 /** YYYY-MM-DD → year + 0-based month, without UTC timezone shift. */
-function calendarMonthKey(isoDate: string): string {
+export function calendarMonthKey(isoDate: string): string {
   const [year, month] = isoDate.split('-')
   return `${year}-${Number(month) - 1}`
 }
@@ -361,12 +361,12 @@ export function compareHabits(
     return totalCost
   }
 
-  const lowBalanceCost = simulate(false)
-  const monthlyCost = simulate(true)
+  const lowBalanceCost = parseFloat(simulate(false).toFixed(2))
+  const monthlyCost = parseFloat(simulate(true).toFixed(2))
 
   return {
-    lowBalanceCost: parseFloat(lowBalanceCost.toFixed(2)),
-    monthlyCost: parseFloat(monthlyCost.toFixed(2)),
+    lowBalanceCost,
+    monthlyCost,
     winner:
       lowBalanceCost < monthlyCost
         ? 'Low Balance'
